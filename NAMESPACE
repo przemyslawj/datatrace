@@ -1,0 +1,12 @@
+useDynLib(datatrace, .registration=TRUE)
+importFrom(Rcpp, evalCpp)
+
+import(data.table)
+import(purrr)
+import(abind)
+import(dplyr)
+import(smoothie) # for gaussian smoothing
+import(reshape2) # for melt
+import(ggplot2)
+
+exportPattern("^[[:alpha:]]+")
