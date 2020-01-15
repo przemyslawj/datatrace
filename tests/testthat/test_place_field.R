@@ -9,7 +9,7 @@ test_that('test place field correct', {
   
   pf = calcPlaceField(xy, 6, trace, binnedTrace, c(5, length(trace)), 0, 2, 1)
   expect_equal(pf$field[1:6], c(0, 0, 0, 1, 0.5, NaN))
-  expect_gt(pf$spatial.information, 1.0)
+  expect_gt(pf$spatial.information, 0.5)
   expect_equal(c(1, 1, 2, 2, 2, 0), pf$occupancy[1:6])
 })
   
@@ -27,10 +27,10 @@ test_that('test cell.spatial.info succeeds', {
   result = cell.spatial.info(df, 6, 2, min.occupancy.sec = 1, bin.hz = 1)
   
   field = result$field %>% .to.matrix(6, 2)
-  expect_true(all(field[2:6,2] > 0))
+  expect_true(all(field[2:6,2] >= 0))
   expect_true(is.na(field[1,2]))
   expect_gt(result$cell_info$mutual.info, 0.6)
-  expect_gt(result$cell_info$spatial.information, 1.0)
+  expect_gt(result$cell_info$spatial.information, 0.5)
 })
 
 test_that('test cell.spatial.info discards unoccupied', {
@@ -46,8 +46,8 @@ test_that('test cell.spatial.info discards unoccupied', {
   result = cell.spatial.info(df, 6, 2, min.occupancy.sec = 1, bin.hz = 2, generate.plots = TRUE)
   
   field = result$field %>% .to.matrix(6, 2)
-  expect_true(all(field[4:6,2] > 0))
+  expect_true(all(field[4:6,2] >= 0))
   expect_true(all(is.na(field[1:3,2])))
   expect_gt(result$cell_info$mutual.info, 0.6)
-  expect_gt(result$cell_info$spatial.information, 1.0)
+  expect_gt(result$cell_info$spatial.information, 0.5)
 })

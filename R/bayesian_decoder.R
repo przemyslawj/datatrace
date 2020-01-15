@@ -160,20 +160,22 @@ smooth.likelihoods = function(model.bayes, sigma=0.8) {
 #   return(results.df)
 # }
 
-bin.distance.error = function(expected.xy, actual.xy) {
-  actual.s.bin = from_1dim(actual.xy)
-  expected.s.bin = from_1dim(expected.xy)
-  dist = norm2(actual.s.bin$x - expected.s.bin$x, actual.s.bin$y - expected.s.bin$y)
-  return(dist)
+bin.distance.error = function(nstim.x, nstim.y) {
+  function(expected.xy, actual.xy) { 
+    actual.s.bin = from_1dim(actual.xy, nstim.y)
+    expected.s.bin = from_1dim(expected.xy, nstim.y)
+    dist = norm2(actual.s.bin$x - expected.s.bin$x, actual.s.bin$y - expected.s.bin$y)
+    return(dist)
+  }
 }
 
 eval.testdata2 = function(test.df, 
                           model.bayes, 
-                          predict.fun=bayesmax, 
-                          error.fun=bin.distance.error,
-                          stim.var=bin.xy,
-                          value.var=response_bin, 
-                          nstim.bins=xybins^2) {
+                          predict.fun, 
+                          error.fun,
+                          stim.var,
+                          nstim.bins,
+                          value.var) {
   stim.var = enquo(stim.var)
   stim.var.name = quo_name(stim.var)
   value.var.name = quo_name(enquo(value.var))
@@ -239,14 +241,15 @@ filter.sampled = function(training.df, test.df, min.samples=20) {
 }
 
 eval.decoder = function(binned.traces, 
+                        nstim.bins,
+                        error.fun,
                         train.fun=create.discrete.bayes,
                         predict.fun=bayesmax,
                         stim.var=bin.xy,
                         value.var=response_bin,
-                        nstim.bins=xybins * xybins,
                         training.split.fraction=0.8, 
                         cv=TRUE,
-                        error.fun=bin.distance.error) {
+                        min.samples=20) {
   stim.var = enquo(stim.var)
   value.var = enquo(value.var)
   
@@ -264,7 +267,9 @@ eval.decoder = function(binned.traces,
     test.index.start = find.first.timestamp(binned.traces$time_bin, max(1, test.index.start - nrows.testing), -1)
     test.indecies = test.index.start:test.index.end
     train.indecies = setdiff(1:nrow(binned.traces), test.indecies)
-    filtered.dfs = filter.sampled(binned.traces[train.indecies,], binned.traces[test.indecies,])
+    filtered.dfs = filter.sampled(binned.traces[train.indecies,], 
+                                  binned.traces[test.indecies,],
+                                  min.samples=min.samples)
     training.df = filtered.dfs$train
     test.df = filtered.dfs$test
 

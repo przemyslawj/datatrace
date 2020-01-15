@@ -24,15 +24,18 @@ public:
   NumericVector occupancyMap;
   NumericVector fr;
   double mfr;
+  double min_trace;
   double sparsity;
   
   MfrModel(NumericVector& occupancyMap,
                     NumericVector& fr,
                     double mfr,
+                    double min_trace,
                     double sparsity) {
     this->occupancyMap = occupancyMap;
     this->fr = fr;
     this->mfr = mfr;
+    this->min_trace = min_trace;
     this->sparsity = sparsity;
   }
 };
@@ -83,10 +86,14 @@ MfrModel createMfrModel(IntegerVector& bin_xy,
   // Calculate occupancy and total activity maps
   double mfr = 0;
   for (int i = 0; i < trace.size(); ++i) {
-    int xy = bin_xy[i] - 1;
+    int xy = std::max(0, bin_xy[i] - 1);
+    if (xy >= nstim) {
+      stop("Stim value higher than the number of bins");
+    }
+    double trace_val = trace[i];
     occupancyMap[xy] += 1;
-    totalActivityMap[xy] += trace[i];
-    mfr += trace[i] / trace.size();
+    totalActivityMap[xy] += trace_val;
+    mfr += trace_val / trace.size();
   }  
   
   double sparsity = 0.0;
@@ -100,33 +107,28 @@ MfrModel createMfrModel(IntegerVector& bin_xy,
     }
   }
 
-  // Avoid FR==0, so the log's can be calculated everywhere
-  double fr_offset = -10e-10;
-  // Update firing rates by the offset
-  for (int xy = 0; xy < nstim; ++xy) {
-    if (!std::isnan(fr[xy])) {
-      fr[xy] -= fr_offset;
-    }
-  }
-
-  // Calculate spatial information and the place field.
-  mfr -= fr_offset;
-  MfrModel result(occupancyMap, fr, mfr, sparsity);
-  
-  return result;
+  double min_trace = (double) *(std::min_element(trace.cbegin(), trace.cend()));
+  return MfrModel(occupancyMap, fr, mfr, min_trace, sparsity);
 }
 
 double calculateSI(MfrModel mfrModel, int minOccupancy, int N) {
   double SI = 0.0;
+  
+  // normalize the trace values to be positive and higher than 0.01
+  double trace_offset = 0.0; 
+  if (mfrModel.min_trace < 0.01) {
+    trace_offset = mfrModel.min_trace - 0.01;
+  }
+  
+  double mfr = mfrModel.mfr - trace_offset;
   for (int xy = 0; xy < mfrModel.occupancyMap.size(); ++xy) {
     if (mfrModel.occupancyMap[xy] >= minOccupancy) {
       Debug(" xy=" << xy << std::endl);
       double p_occupancy = (double) mfrModel.occupancyMap[xy] / N;
-      if (mfrModel.fr[xy] > 0.0) {
-        double r_SI = p_occupancy * mfrModel.fr[xy] / mfrModel.mfr * log2(mfrModel.fr[xy] / mfrModel.mfr);
-        Debug("partial SI=" << r_SI << std::endl);
-        SI += r_SI;
-      }
+      double fr_xy = mfrModel.fr[xy] - trace_offset;
+      double r_SI = p_occupancy * fr_xy / mfr * log2(fr_xy / mfr);
+      Debug("partial SI=" << r_SI << std::endl);
+      SI += r_SI;
     }
   }
   
@@ -266,5 +268,6 @@ pf$spatial.information
 pf$mutual.info
 pf$mfr
 
+calcPlaceField(xy, 3, trace, binnedTrace + 1, c(7, length(trace)), 0, 2, 1)
 */
 

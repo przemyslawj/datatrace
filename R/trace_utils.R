@@ -54,7 +54,7 @@ timebin.traces = function(data.traces, timebin.dur.msec=200) {
   timebinned.traces = data.traces[, 
                                   lapply(.SD, mean), 
                                   by=.(animal, date, trial_id, trial, exp_title, cell_id, time_bin),
-                                  .SDcols = !c('is.event', 'dist')]
+                                  .SDcols = !c('is.event')]
   setorder(timebinned.traces, time_bin, cell_id)
   nevents.traces = data.traces[, .(nevents=sum(is.event)), 
                                  by=.(animal, date, trial_id, trial, exp_title, cell_id, time_bin)]
@@ -129,7 +129,15 @@ get.trial.ends = function(timestamps) {
 
 # Fast implementation of melting with data.tables
 melt.traces = function(data) {
-  data[, grep("^events_", colnames(data)):=NULL]
+  .remove.cols.expr = function(data, cols.exp) {
+    cols = grep(cols.exp, colnames(data))  
+    if (length(cols) > 0) {
+      data[, grep(cols.exp, colnames(data)):=NULL]
+    }
+  }
+  .remove.cols.expr(data, "^events_")
+  .remove.cols.expr(data, "^dist")
+  
   trace.measure.vars = colnames(data)[stringr::str_starts(colnames(data), 'trace_')]
   #events.measure.vars = colnames(data)[stringr::str_starts(colnames(data), 'events_')]
   deconv.measure.vars = colnames(data)[stringr::str_starts(colnames(data), 'deconvTrace_')]

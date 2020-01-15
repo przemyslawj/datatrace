@@ -33,3 +33,11 @@ isRunning <- function(df, min_run_velocity, mean_run_velocity, window_dur_ms) {
     .Call(`_datatrace_isRunning`, df, min_run_velocity, mean_run_velocity, window_dur_ms)
 }
 
+chunkShuffle <- function(trace, trialEnds, shuffleChunkLength) {
+    .Call(`_datatrace_chunkShuffle`, trace, trialEnds, shuffleChunkLength)
+}
+
+randomShift <- function(trace, trialEnds, minShift) {
+    .Call(`_datatrace_randomShift`, trace, trialEnds, minShift)
+}
+

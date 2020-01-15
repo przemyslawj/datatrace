@@ -106,7 +106,7 @@ cell.spatial.info = function(cell.df,
   si.signif.thresh = quantile(pf$shuffle.si, 0.95, na.rm=TRUE)[[1]]
   si.signif = pf$spatial.information >= si.signif.thresh
   mi.signif.thresh = quantile(pf$shuffle.mi, 0.95, na.rm=TRUE)[[1]]
-  mi.signif = pf$spatial.information >= mi.signif.thresh
+  mi.signif = pf$mutual.info >= mi.signif.thresh
 
   cell_info = list(cell_id=cell_name,
                    spatial.information=pf$spatial.information,
