@@ -12,11 +12,12 @@ using namespace Rcpp;
 #define Debug(x)
 #endif
 
-
+// [[Rcpp::export]]
 NumericVector chunkShuffle(NumericVector& trace,
                            IntegerVector& trialEnds, 
                            int shuffleChunkLength);
 
+// [[Rcpp::export]]
 NumericVector randomShift(NumericVector& trace,
                           IntegerVector& trialEnds, 
                           int minShift);

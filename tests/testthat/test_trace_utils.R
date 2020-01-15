@@ -1,3 +1,26 @@
+context('Test for chunk shuffle')
+test_that('chunkShuffle succeeds', {
+  trace = 1:10
+  trialEnds = c(6, 12)
+  res = chunkShuffle(trace, trialEnds, 2)
+  expect_true(all(res <= 10))
+  expect_true(all(res >= 1))
+  expect_true(all(res[1:6] <= 6))
+  expect_true(all(res[7:10] >= 7))
+  expect_true(all(diff(res)[c(1,3,5,7,9)] == 1))
+})
+
+context('Test for randomShift')
+test_that('randomShift succeeds', {
+  trace = 1:10
+  trialEnds = c(6, 10)
+  res = randomShift(trace, trialEnds, 2)
+  expect_true(all(res[1:6] <= 6))
+  expect_true(all(res[7:10] >= 7))
+  expect_true(all(abs(res[1:6] - trace[1:6]) >= 2))
+  expect_true(all(abs(res[7:10] - trace[7:10]) >= 1))
+})
+
 context('Tests for the filter.running')
 
 test_that('filter.running succeeds for one trial', {

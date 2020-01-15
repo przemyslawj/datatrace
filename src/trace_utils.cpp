@@ -19,7 +19,7 @@ NumericVector chunkShuffle(NumericVector& trace,
   // Shuffle chunks only within the same trial
   int trialStart = 0;
   for (int trial_i = 0; trial_i < trialEnds.size(); ++trial_i) {
-    int trialEnd = trialEnds[trial_i] / shuffleChunkLength;
+    int trialEnd = std::min((int) trialEnds[trial_i] / shuffleChunkLength, nchunks);
     std::random_shuffle(chunkShuffle.begin() + trialStart, chunkShuffle.begin() + trialEnd);
     trialStart = trialEnd;
   }
@@ -46,7 +46,11 @@ NumericVector randomShift(NumericVector& trace,
   
   int trialStart = 0;
   for (int trial_i = 0; trial_i < trialEnds.size(); ++trial_i) {
+    trialEnds[trial_i] = std::min((int) trialEnds[trial_i], (int) trace.size());
     int ntrial = trialEnds[trial_i] - trialStart;
+    if (ntrial <= 2 * minShift) {
+      minShift = std::max(0, ntrial / 2 - 1);
+    }
     int shift = std::rand() % (ntrial - 2 * minShift) + minShift;
     for (int i = 0; i < ntrial; ++i) {
       int within_trial_i = (i + shift) % ntrial;

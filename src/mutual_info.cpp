@@ -1,7 +1,6 @@
 #include "mutual_info.h"
 #include "trace_utils.h"
 
-
 /** 
  * Mutual information calculated for a single stimulus bin.
  * 
@@ -83,15 +82,13 @@ BinnedResponseModel createResponseModel(NumericVector& response,
   std::vector<int> s_counts(nstim, 0);
 
   for (int i = 0; i < response.size(); ++i) {
-    int responseBin = response[i] - 1;
-    int stimBin = stimulus[i] - 1;
-    if (stimBin > nstim) {
-      std::cout << "Error: Stimulus id greater than the passed count of stimuli (nstim)"  << std::endl;
-      continue;
+    int responseBin = std::max(0, (int) response[i] - 1);
+    int stimBin = std::max(0, stimulus[i] - 1);
+    if (stimBin >= nstim) {
+      stop("Stim value higher than the number of bins");
     }
-    if (stimBin < 0) {
-      std::cout << "Error: Stimulus id lower than 1"  << std::endl;
-      continue;
+    if (responseBin >= nresponseBins) {
+      stop("Response value higher than the number of bins");
     }
     
     ++s_counts[stimBin];

@@ -83,7 +83,10 @@ MfrModel createMfrModel(IntegerVector& bin_xy,
   // Calculate occupancy and total activity maps
   double mfr = 0;
   for (int i = 0; i < trace.size(); ++i) {
-    int xy = bin_xy[i] - 1;
+    int xy = std::max(0, bin_xy[i] - 1);
+    if (xy >= nstim) {
+      stop("Stim value higher than the number of bins");
+    }
     occupancyMap[xy] += 1;
     totalActivityMap[xy] += trace[i];
     mfr += trace[i] / trace.size();
@@ -266,5 +269,6 @@ pf$spatial.information
 pf$mutual.info
 pf$mfr
 
+calcPlaceField(xy, 3, trace, binnedTrace + 1, c(7, length(trace)), 0, 2, 1)
 */
 

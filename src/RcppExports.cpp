@@ -120,6 +120,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// chunkShuffle
+NumericVector chunkShuffle(NumericVector& trace, IntegerVector& trialEnds, int shuffleChunkLength);
+RcppExport SEXP _datatrace_chunkShuffle(SEXP traceSEXP, SEXP trialEndsSEXP, SEXP shuffleChunkLengthSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector& >::type trace(traceSEXP);
+    Rcpp::traits::input_parameter< IntegerVector& >::type trialEnds(trialEndsSEXP);
+    Rcpp::traits::input_parameter< int >::type shuffleChunkLength(shuffleChunkLengthSEXP);
+    rcpp_result_gen = Rcpp::wrap(chunkShuffle(trace, trialEnds, shuffleChunkLength));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_datatrace_bayesmax", (DL_FUNC) &_datatrace_bayesmax, 3},
@@ -130,6 +143,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_datatrace_mutual_info_with_shuffles", (DL_FUNC) &_datatrace_mutual_info_with_shuffles, 7},
     {"_datatrace_calcPlaceField", (DL_FUNC) &_datatrace_calcPlaceField, 8},
     {"_datatrace_isRunning", (DL_FUNC) &_datatrace_isRunning, 4},
+    {"_datatrace_chunkShuffle", (DL_FUNC) &_datatrace_chunkShuffle, 3},
     {NULL, NULL, 0}
 };
 
