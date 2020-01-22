@@ -37,6 +37,20 @@ plot.pf = function(df, max.x, max.y) {
     theme_void() 
 }
 
+plot.trace.events = function(df) {
+  df.events = filter(df, nevents > 0)
+  mid.pt = c(50,50)
+  df %>%
+    arrange(timestamp) %>%
+    filter( sqrt((mid.pt[1] - x)^2 + (mid.pt[1] - y)^2) < mid.pt[1]) %>%
+    ggplot(aes(x=x, y=100-y)) +
+    geom_path(aes(group=trial_id), alpha=0.6) +
+    geom_point(data=df.events, color='red') +
+    #facet_grid(trial_id ~ cell_id) +
+    xlim(c(0, 100)) + ylim(c(0, 100)) +
+    theme_void()
+}
+
 
 field.cor = function(field1, field2, max.xy, make.cor.plot=FALSE) {
   result = list()

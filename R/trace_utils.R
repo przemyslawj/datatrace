@@ -64,6 +64,9 @@ timebin.traces = function(data.traces, timebin.dur.msec=200) {
 }
 
 stimbin.traces = function(data.traces, stim.var, bin.width) {
+  if (nrow(data.traces) == 0) {
+    return(data.traces)
+  }
   stim.var = enquo(stim.var)
   
   bin.var.name = paste0('bin.', quo_name(stim.var))
@@ -90,6 +93,10 @@ get.response.bin = function(vals, quantile.fractions) {
 
 bin.responses = function(df, quantile.fractions, binned.var='trace') {
   df = data.table(df)
+  if (nrow(df) == 0) {
+    return(df)
+  }
+  
   binned.df = df[, response_bin := get.response.bin(.SD[[binned.var]], quantile.fractions), 
                  by=c('animal', 'date', 'cell_id')]
   binned.df
@@ -108,6 +115,10 @@ bin.time.space = function(data.traces,
                           binned.var='trace', 
                           timebin.dur.msec=200) {
   data.traces = data.table(data.traces)
+  if (nrow(data.traces) == 0) {
+    return(data.traces)
+  }
+  
   timebinned.traces = timebin.traces(data.traces[x >= 0 & y >= 0, ],
                                      timebin.dur.msec = timebin.dur.msec) %>%
     stimbin.traces(x, 100/nbins.x) %>%
