@@ -25,6 +25,10 @@ mutual_info_with_shuffles <- function(response, nresponseBins, stimulus, nstim, 
     .Call(`_datatrace_mutual_info_with_shuffles`, response, nresponseBins, stimulus, nstim, trialEnds, nshuffles, shuffleChunkLength)
 }
 
+create_mfr_model <- function(bin_xy, nstim, trace, minOccupancy) {
+    .Call(`_datatrace_create_mfr_model`, bin_xy, nstim, trace, minOccupancy)
+}
+
 calcPlaceField <- function(bin_xy, nstim, trace, binnedTrace, trialEnds, nshuffles, shuffleChunkLength, minOccupancy) {
     .Call(`_datatrace_calcPlaceField`, bin_xy, nstim, trace, binnedTrace, trialEnds, nshuffles, shuffleChunkLength, minOccupancy)
 }

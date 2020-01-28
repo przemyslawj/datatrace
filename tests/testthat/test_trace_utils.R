@@ -1,4 +1,7 @@
+#########################################
 context('Test for chunk shuffle')
+#########################################
+
 test_that('chunkShuffle succeeds', {
   trace = 1:10
   trialEnds = c(6, 12)
@@ -10,7 +13,11 @@ test_that('chunkShuffle succeeds', {
   expect_true(all(diff(res)[c(1,3,5,7,9)] == 1))
 })
 
+
+#########################################
 context('Test for randomShift')
+#########################################
+
 test_that('randomShift succeeds', {
   trace = 1:10
   trialEnds = c(6, 10)
@@ -21,7 +28,10 @@ test_that('randomShift succeeds', {
   expect_true(all(abs(res[7:10] - trace[7:10]) >= 1))
 })
 
+
+#########################################
 context('Tests for the filter.running')
+#########################################
 
 test_that('filter.running succeeds for one trial', {
   running.vel.thr = 2
@@ -45,6 +55,11 @@ test_that('filter.running succeeds for one trial', {
   expect_equal(df.filtered$id, c(1:5, 11:15))
 }) 
 
+
+#########################################
+context('Tests for event detection')
+#########################################
+
 test_that('test detect.events succeeds', {
   df = data.frame(deconv_trace=c(1:10, c(0, 12:20)), 
                   animal='a', 
@@ -56,6 +71,11 @@ test_that('test detect.events succeeds', {
   expect_equal(df$is.event[11], FALSE)
   expect_equal(sum(df$is.event), 18)
 })
+
+
+#########################################
+context('Tests for event detection')
+#########################################
 
 test_that('bin.time.space succeeds', {
   df = data.frame(
@@ -73,7 +93,7 @@ test_that('bin.time.space succeeds', {
     date='2019-01-01'
   )
   res = bin.time.space(df, 5, 5,
-                       bin.quantile.fractions = c(0.5, 1.0), 
+                       get.bin.thresholds.fun=get.quantiles.fun(c(0.5, 1.0)), 
                        binned.var='trace', 
                        timebin.dur.msec = 200)
   expect_equal(nrow(res), 5)

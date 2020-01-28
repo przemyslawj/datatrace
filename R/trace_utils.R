@@ -85,33 +85,37 @@ from_1dim = function(z, nbins.y) {
   list(x=as.integer(floor(z/nbins.y)), y=z%%nbins.y)
 }
 
-get.response.bin = function(vals, quantile.fractions) {
-  trace.quantiles = quantile(vals, quantile.fractions) + 0.001
-  map_int(vals, ~ dplyr::first(which(.x <= trace.quantiles)))
+get.quantiles.fun = function(quantile.fractions) {
+  function(vals) {  quantile(vals, quantile.fractions) + 0.001 }
 }
 
-
-bin.responses = function(df, quantile.fractions, binned.var='trace') {
+bin.responses = function(df, get.bin.thresholds.fun, binned.var='trace') {
   df = data.table(df)
   if (nrow(df) == 0) {
     return(df)
   }
   
-  binned.df = df[, response_bin := get.response.bin(.SD[[binned.var]], quantile.fractions), 
+  get.response.bin = function(vals, get.bin.thresholds.fun) {
+    bin.thresholds = get.bin.thresholds.fun(vals)
+    map_int(vals, ~ dplyr::first(which(.x <= bin.thresholds)), default=length(bin.thresholds))
+  }
+  
+  binned.df = df[, response_bin := get.response.bin(.SD[[binned.var]], get.bin.thresholds.fun), 
                  by=c('animal', 'date', 'cell_id')]
   binned.df
 }
 
-nevents.bin.responses = function(df, nevents.thr=0.5) {
-  df = data.table(df)
-  binned.df = df[, response_bin := ifelse(nevents >= nevents.thr, 2, 1)]
-  binned.df
+bin.nevents = function(df, nevents.thr=c(0.5, 2.0, 6.0)) {
+  nevents.binning.fun = function(nevents) {
+    nevents.thr
+  }
+  bin.responses(df, nevents.binning.fun, binned.var='ntrace')
 }
 
 bin.time.space = function(data.traces, 
                           nbins.x,
                           nbins.y,
-                          bin.quantile.fractions=NULL, 
+                          get.bin.thresholds.fun=NULL, 
                           binned.var='trace', 
                           timebin.dur.msec=200) {
   data.traces = data.table(data.traces)
@@ -124,8 +128,8 @@ bin.time.space = function(data.traces,
     stimbin.traces(x, 100/nbins.x) %>%
     stimbin.traces(y, 100/nbins.y) %>%
     data.table()
-  if (!is.null(bin.quantile.fractions)) {
-    binned.traces = bin.responses(timebinned.traces, bin.quantile.fractions, binned.var=binned.var)
+  if (!is.null(get.bin.thresholds.fun)) {
+    binned.traces = bin.responses(timebinned.traces, get.bin.thresholds.fun, binned.var=binned.var)
   } else {
     binned.traces = timebinned.traces
   }
@@ -240,7 +244,7 @@ pca.binned.traces = function(binned.traces) {
   melt.pc.df = melt.pc.df[metadata.df, on='time_bin']
   
   quantile.fractions = c(0.2, 0.4, 0.6, 0.8, 1.0)
-  binned.pc.df = bin.responses(melt.pc.df, quantile.fractions)
+  binned.pc.df = bin.responses(melt.pc.df, get.quantiles.fun(quantile.fractions))
   setkey(binned.pc.df, time_bin, cell_id)
   setorder(binned.pc.df, time_bin, cell_id)
   

@@ -111,6 +111,21 @@ MfrModel createMfrModel(IntegerVector& bin_xy,
   return MfrModel(occupancyMap, fr, mfr, min_trace, sparsity);
 }
 
+// [[Rcpp::export]]
+SEXP create_mfr_model(IntegerVector& bin_xy,
+                      int nstim,
+                      NumericVector& trace,
+                      double minOccupancy) {
+  MfrModel mfrModel = createMfrModel(bin_xy, nstim, trace, minOccupancy);
+  List res;
+  res["occupancyMap"] = mfrModel.occupancyMap;
+  res["fr"] = mfrModel.fr;
+  res["mfr"] = mfrModel.mfr;
+  res["min_trace"] = mfrModel.min_trace;
+  res["sparsity"] = mfrModel.sparsity;
+  return res;
+}
+
 double calculateSI(MfrModel mfrModel, int minOccupancy, int N) {
   double SI = 0.0;
   

@@ -94,7 +94,8 @@ test_that("bin.responses success for two cells", {
   df$cell_id = as.factor(df$cell_id)
   df = data.table(df)
   quantile.fractions=c(0.5, 1.0)
-  actual.binned = bin.responses(df, quantile.fractions)
+  actual.binned = bin.responses(df,
+                                get.bin.thresholds.fun=get.quantiles.fun(quantile.fractions))
   actual.binned = actual.binned %>% arrange(cell_id, time_bin)
   expect_equal(nrow(actual.binned), 8)
   expect_equal(actual.binned$response_bin, c(1, 1, 2, 2, 2, 2, 1, 1))

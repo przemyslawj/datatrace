@@ -30,15 +30,16 @@ create.pf.df = function(M, occupancyM, min.occupancy.sec=1, frame.rate=20, sigma
 plot.pf = function(df, max.x, max.y) {
   jet.colours = colorRampPalette(c("#00007F", "blue", "#007FFF", "cyan", "#7FFF7F", "yellow", "#FF7F00", "red", "#7F0000"))
   
-  ggplot() +
-    geom_raster(data=df, aes(x=Var1, y=max.y-Var2, fill=value.conv), interpolate=FALSE) +
+  ggplot(df, aes(x=Var1, y=max.y-Var2)) +
+    geom_raster(aes(fill=value.conv), interpolate=FALSE) +
     scale_fill_gradientn(colours=jet.colours(7)) +
-    xlim(c(0, max.x)) + ylim(c(0, max.x)) +
+    xlim(c(0, max.x)) + ylim(c(0, max.y)) +
     theme_void() 
 }
 
-plot.trace.events = function(df) {
-  df.events = filter(df, nevents > 0)
+plot.trace.events = function(df, event.var=nevents, event.thr=0.5) {
+  event.var = enquo(event.var)
+  df.events = filter(df, !!event.var >= event.thr)
   mid.pt = c(50,50)
   df %>%
     arrange(timestamp) %>%
@@ -92,6 +93,7 @@ cell.spatial.info = function(cell.df,
                              binned.trace.var='response_bin',
                              min.occupancy.sec=1) {
   cell.df = data.table(cell.df)
+  
   cell.nevents = nrow(cell.df[nevents > 0,])
   trace.vals = cell.df[[trace.var]]
 

@@ -88,6 +88,20 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// create_mfr_model
+SEXP create_mfr_model(IntegerVector& bin_xy, int nstim, NumericVector& trace, double minOccupancy);
+RcppExport SEXP _datatrace_create_mfr_model(SEXP bin_xySEXP, SEXP nstimSEXP, SEXP traceSEXP, SEXP minOccupancySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerVector& >::type bin_xy(bin_xySEXP);
+    Rcpp::traits::input_parameter< int >::type nstim(nstimSEXP);
+    Rcpp::traits::input_parameter< NumericVector& >::type trace(traceSEXP);
+    Rcpp::traits::input_parameter< double >::type minOccupancy(minOccupancySEXP);
+    rcpp_result_gen = Rcpp::wrap(create_mfr_model(bin_xy, nstim, trace, minOccupancy));
+    return rcpp_result_gen;
+END_RCPP
+}
 // calcPlaceField
 SEXP calcPlaceField(IntegerVector& bin_xy, int nstim, NumericVector& trace, NumericVector& binnedTrace, IntegerVector& trialEnds, int nshuffles, int shuffleChunkLength, double minOccupancy);
 RcppExport SEXP _datatrace_calcPlaceField(SEXP bin_xySEXP, SEXP nstimSEXP, SEXP traceSEXP, SEXP binnedTraceSEXP, SEXP trialEndsSEXP, SEXP nshufflesSEXP, SEXP shuffleChunkLengthSEXP, SEXP minOccupancySEXP) {
@@ -154,6 +168,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_datatrace_bayesmax_mfr", (DL_FUNC) &_datatrace_bayesmax_mfr, 3},
     {"_datatrace_mutual_info", (DL_FUNC) &_datatrace_mutual_info, 4},
     {"_datatrace_mutual_info_with_shuffles", (DL_FUNC) &_datatrace_mutual_info_with_shuffles, 7},
+    {"_datatrace_create_mfr_model", (DL_FUNC) &_datatrace_create_mfr_model, 4},
     {"_datatrace_calcPlaceField", (DL_FUNC) &_datatrace_calcPlaceField, 8},
     {"_datatrace_isRunning", (DL_FUNC) &_datatrace_isRunning, 4},
     {"_datatrace_chunkShuffle", (DL_FUNC) &_datatrace_chunkShuffle, 3},
