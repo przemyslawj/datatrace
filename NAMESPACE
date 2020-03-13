@@ -8,5 +8,6 @@ import(dplyr)
 import(smoothie) # for gaussian smoothing
 import(reshape2) # for melt
 import(ggplot2)
+import(pracma)
 
 exportPattern("^[[:alpha:]]+")

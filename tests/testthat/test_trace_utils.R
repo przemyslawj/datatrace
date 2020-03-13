@@ -61,7 +61,7 @@ context('Tests for event detection')
 #########################################
 
 test_that('test detect.events succeeds', {
-  df = data.frame(deconv_trace=c(1:10, c(0, 12:20)), 
+  df = data.frame(deconv_trace=c(1:5, 5, 7, 7, 6, 5, c(0, 12:19, 18)), 
                   animal='a', 
                   cell_id=rep(1:2,each=10), 
                   date='2019-01-01')
@@ -69,7 +69,9 @@ test_that('test detect.events succeeds', {
   detect.events(df, deconv.threshold=0.11)
   expect_equal(df$is.event[1], FALSE)
   expect_equal(df$is.event[11], FALSE)
-  expect_equal(sum(df$is.event), 18)
+  expect_equal(df$is.event[7], TRUE)
+  expect_equal(df$is.event[19], TRUE)
+  expect_equal(sum(df$is.event), 2)
 })
 
 

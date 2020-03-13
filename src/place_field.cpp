@@ -75,6 +75,16 @@ public:
   }
 };
 
+/**
+ * Calculates MfrModel for the stimulus values and the corresponding firing signal.
+ * 
+ * Sparsity across the stimulus values, e.g. space, is calculated as:
+ * sparsity = (\sum_x p_x * fr_x)^2 / (\sum_x (mfr)^2), where:
+ * - x is a stimulus bin, e.g. spatial bin,
+ * - p_x - probability of stimulus bin occupancy
+ * - fr_x - firing rate for bin x
+ * - mfr - mean firing rate
+ */
 MfrModel createMfrModel(IntegerVector& bin_xy,
                         int nstim,
                         NumericVector& trace,
@@ -126,10 +136,19 @@ SEXP create_mfr_model(IntegerVector& bin_xy,
   return res;
 }
 
+/*
+ * Spatial information per spike, calculated as: 
+ * \sum_xy p_xy * fr_xy / mfr * log2(fr_xy / mfr), where:
+ * - xy is a spatial bin
+ * - p_xy - occupancy probability of that bin,
+ * - fr_xy - firing rate or mean trace value in that bin
+ * - mfr - mean firing rate or mean trace value
+ */
 double calculateSI(MfrModel mfrModel, int minOccupancy, int N) {
   double SI = 0.0;
   
-  // normalize the trace values to be positive and higher than 0.01
+  // normalize the firing rates to be positive and higher than 0.01
+  // this is so the log values can be calculated
   double trace_offset = 0.0; 
   if (mfrModel.min_trace < 0.01) {
     trace_offset = mfrModel.min_trace - 0.01;

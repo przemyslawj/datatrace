@@ -47,7 +47,19 @@ plot.trace.events = function(df, event.var=nevents, event.thr=0.5) {
     ggplot(aes(x=x, y=100-y)) +
     geom_path(aes(group=trial_id), alpha=0.6) +
     geom_point(data=df.events, color='red') +
-    #facet_grid(trial_id ~ cell_id) +
+    xlim(c(0, 100)) + ylim(c(0, 100)) +
+    theme_void()
+}
+
+plot.event.vectors = function(df, event.var=nevents, event.thr=0.5) {
+  event.var = enquo(event.var)
+  arrow.len = 5
+  df.events = dplyr::filter(df, !!event.var >= event.thr) %>%
+    dplyr::mutate(arrow.x = x + cos(angle / 180 * pi) * arrow.len,
+                  arrow.y = y + sin(angle / 180 * pi) * arrow.len)
+  ggplot(df.events, aes(x=x, y=100-y)) +
+    geom_segment(aes(x=x, y=100-y, xend=arrow.x, yend=100-arrow.y, color=is_running),
+                 arrow = ggplot2::arrow(length = unit(0.015, "npc"))) +
     xlim(c(0, 100)) + ylim(c(0, 100)) +
     theme_void()
 }

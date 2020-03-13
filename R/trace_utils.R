@@ -19,11 +19,17 @@ read.data.trace = function(caimg_result_dir, filter_exp_title = NA) {
     data = data[exp_title == filter_exp_title,]  
   }
   
+  if (nrow(data) == 0) {
+    return(data)
+  }
+  
   data.traces = melt.traces(data)
   data.traces = left_join(data.traces, cellmapping.df, by=c('cell'='cell_no'))
   dir_parts = str_split(caimg_result_dir, '/')
   animal = dir_parts[[1]][length(dir_parts[[1]]) - 2]
-  data.traces$animal = animal
+  if (nrow(data.traces) > 0) {
+    data.traces$animal = animal
+  }
   data.traces = data.table(data.traces)
   data.traces = data.traces[smooth_trans_x >= 0 & smooth_trans_y >= 0, ]
   
@@ -31,15 +37,35 @@ read.data.trace = function(caimg_result_dir, filter_exp_title = NA) {
   return(data.traces)
 }
 
-.calc.event.vec = function(deconv_trace, deconv.threshold=0.1) {
+.calc.event.vec = function(deconv_trace, deconv.threshold=0.1, minpeakdistance=1) {
   deconv.thr.val = deconv.threshold * max(deconv_trace)
-  res = map_lgl(deconv_trace, ~ .x >= deconv.thr.val)
+  peak.mat = findpeaks(deconv_trace, 
+                       minpeakheight=deconv.thr.val, 
+                       minpeakdistance=minpeakdistance,
+                       zero='+')
+  res = rep(FALSE, length(deconv_trace))
+  if (!is.null(peak.mat)) {
+    res[peak.mat[,2]] = TRUE
+  }
   res
 }
 
-detect.events = function(data.traces, deconv.threshold=0.1) {
-  data.traces[, is.event := .calc.event.vec(.SD$deconv_trace, deconv.threshold) , by=c('animal', 'date', 'cell_id')]
+detect.events = function(data.traces, deconv.threshold=0.1, minpeakdistance=1) {
+  data.traces[, is.event := .calc.event.vec(.SD$deconv_trace, deconv.threshold, minpeakdistance) , by=c('animal', 'date', 'cell_id')]
   return(data.traces)
+}
+
+overlapping.timebin.traces = function(data.traces, timebin.dur.msec=500) {
+  overlap.dur.msec = timebin.dur.msec / 2
+  t1 = timebin.traces(data.traces, timebin.dur.msec)
+  t1[, time_bin := time_bin * 2]
+  
+  t2 = timebin.traces(data.traces[, timestamp := timestamp + overlap.dur.msec], timebin.dur.msec)
+  t2[, time_bin := time_bin * 2 + 1]
+  
+  merged.t = as.data.table(rbind(t1, t2))
+  setorder(merged.t, time_bin, cell_id)
+  return(merged.t)
 }
 
 timebin.traces = function(data.traces, timebin.dur.msec=200) {
@@ -123,8 +149,8 @@ bin.time.space = function(data.traces,
     return(data.traces)
   }
   
-  timebinned.traces = timebin.traces(data.traces[x >= 0 & y >= 0, ],
-                                     timebin.dur.msec = timebin.dur.msec) %>%
+  timebinned.traces = overlapping.timebin.traces(data.traces[x >= 0 & y >= 0, ],
+                                                 timebin.dur.msec = timebin.dur.msec) %>%
     stimbin.traces(x, 100/nbins.x) %>%
     stimbin.traces(y, 100/nbins.y) %>%
     data.table()

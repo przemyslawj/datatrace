@@ -1,7 +1,4 @@
 # Calculates prior and likelihood used by Bayesian decoder
-# response: matrix of trace values cell x time
-# stimulus: vector of stimulus values length equal time samples
-# nresponse.bins: count of bins for trace values
 #
 # Returns a list with fields
 # prior: prior probability of each stimulus, length equal nstim.bins
@@ -17,7 +14,7 @@ create.discrete.bayes = function(training.df, nstim.bins=20*20, value.var=respon
   stimulus = training.df %>%
     dplyr::select(time_bin, !! stim.var) %>%
     dplyr::arrange(time_bin) %>%
-    dplyr::distinct()
+    dplyr::distinct(time_bin, .keep_all=TRUE) # keep one stimulus value per time bin
   stimulus = stimulus[[2]]
   
   occupancy.hist = hist(stimulus, breaks=0:nstim.bins, plot=FALSE)
@@ -31,10 +28,10 @@ create.discrete.bayes = function(training.df, nstim.bins=20*20, value.var=respon
   M = array(0, dim=c(nstim.bins, ncells, nresponse.bins))
   # Make unseen bins probability > 0 by adding 1 to each response_bin count
   M[visited,,] = 1
-  for (s_i in 1:length(stimulus)) {
+  for (time_bin_i in 1:length(stimulus)) {
     for (cell_i in 1:ncells) {
-      response_bin = response[cell_i, s_i];
-      M[stimulus[s_i], cell_i, response_bin] = M[stimulus[s_i], cell_i, response_bin]  + 1
+      response_bin = response[cell_i, time_bin_i];
+      M[stimulus[time_bin_i], cell_i, response_bin] = M[stimulus[time_bin_i], cell_i, response_bin] + 1
     }
   }
   
