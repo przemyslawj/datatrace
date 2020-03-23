@@ -218,6 +218,9 @@ random.prior.classifier = function(prior, likelihood, pv) {
   list(s=s, prob=prior[s], density=rep(1 / length(prior), length(prior)))
 }
 
+# Find index of the first timestamp with the value equal timestamps[ind].
+# Finds leftmost index if inc==-1, and rightmost if inc==1.
+# Requires the timestamps to be sorted.
 find.first.timestamp = function(timestamps, ind, inc=1) {
   while ((ind + inc > 0) &&
          (ind + inc <= length(timestamps)) &&
@@ -228,6 +231,8 @@ find.first.timestamp = function(timestamps, ind, inc=1) {
   return(ind)
 }
 
+# Filter the two data frames keeping only rows with bin.xy sampled more than
+# min.samples times.
 filter.sampled = function(training.df, test.df, min.samples=20) {
   bin.samples = training.df[, .(nsamples=length(unique(time_bin))), by=bin.xy]
   train.filtered = bin.samples[training.df, on='bin.xy'][nsamples >= min.samples,]
@@ -237,6 +242,7 @@ filter.sampled = function(training.df, test.df, min.samples=20) {
        test=test.filtered)
 }
 
+# Train and evaluate the decoder
 eval.decoder = function(binned.traces, 
                         nstim.bins,
                         error.fun,
@@ -246,9 +252,12 @@ eval.decoder = function(binned.traces,
                         value.var=response_bin,
                         training.split.fraction=0.8, 
                         cv=TRUE,
-                        min.samples=20) {
+                        min.samples=20,
+                        filter.test.traces.fun=NULL) {
   stim.var = enquo(stim.var)
   value.var = enquo(value.var)
+  
+  setorder(binned.traces, time_bin, cell_id)
   
   ncv = ifelse(cv, (1.0 / (1.0 - training.split.fraction)) %>% floor %>% as.integer, 1)
   
@@ -263,22 +272,25 @@ eval.decoder = function(binned.traces,
     test.index.end = find.first.timestamp(binned.traces$time_bin, test.index.start, 1)
     test.index.start = find.first.timestamp(binned.traces$time_bin, max(1, test.index.start - nrows.testing), -1)
     test.indecies = test.index.start:test.index.end
-    train.indecies = setdiff(1:nrow(binned.traces), test.indecies)
-    filtered.dfs = filter.sampled(binned.traces[train.indecies,], 
+    filtered.dfs = filter.sampled(binned.traces[-test.indecies,], 
                                   binned.traces[test.indecies,],
                                   min.samples=min.samples)
     training.df = filtered.dfs$train
     test.df = filtered.dfs$test
+    if (!is.null(filter.test.traces.fun)) {
+      test.df = filter.test.traces.fun(test.df)
+    }
 
-    model.bayes = train.fun(training.df, 
-                            nstim.bins=nstim.bins, 
-                            value.var=!!value.var,
-                            stim.var=!!stim.var)
-    
-    #smooth.model.bayes = smooth.likelihoods(model.bayes)
     if (nrow(test.df) == 0) {
       warning('0 rows for testing after filtering with min samples')
     } else {
+      model.bayes = train.fun(training.df, 
+                              nstim.bins=nstim.bins, 
+                              value.var=!!value.var,
+                              stim.var=!!stim.var)
+      
+      #smooth.model.bayes = smooth.likelihoods(model.bayes)
+
       system.time(eval.res <- eval.testdata2(test.df, 
                                              model.bayes, 
                                              predict.fun=predict.fun,
