@@ -48,15 +48,17 @@ NumericVector randomShift(NumericVector& trace,
   for (int trial_i = 0; trial_i < trialEnds.size(); ++trial_i) {
     trialEnds[trial_i] = std::min((int) trialEnds[trial_i], (int) trace.size());
     int ntrial = trialEnds[trial_i] - trialStart;
-    if (ntrial <= 2 * minShift) {
-      minShift = std::max(0, ntrial / 2 - 1);
+    if (ntrial > 0) {
+      if (ntrial < 2 * minShift) {
+        Rcout << "[warning] randomShift: trial shorter than minShift=" << minShift << " using half value" << std::endl;
+        minShift = std::max(0, ntrial / 2 - 1);
+      }
+      int shift = std::rand() % (ntrial - 2 * minShift + 1) + minShift;
+      for (int i = 0; i < ntrial; ++i) {
+        int within_trial_i = (i + shift) % ntrial;
+        shiftedTrace[trialStart + i] = trace[trialStart + within_trial_i];
+      }
     }
-    int shift = std::rand() % (ntrial - 2 * minShift) + minShift;
-    for (int i = 0; i < ntrial; ++i) {
-      int within_trial_i = (i + shift) % ntrial;
-      shiftedTrace[trialStart + i] = trace[trialStart + within_trial_i];
-    }
-    
     trialStart = trialEnds[trial_i];
   }
   
@@ -109,12 +111,8 @@ LogicalVector isRunning(DataFrame& df,
   return result;
 }
 
-
-// You can include R code blocks in C++ files processed with sourceCpp
-// (useful for testing and development). The R code will be automatically 
-// run after the compilation.
-//
-
 /*** R
+trace = c(0, 1, 1, 1, 1, 1, 1, 0)
 
+randomShift(trace, c(7, length(trace)), 2)
 */

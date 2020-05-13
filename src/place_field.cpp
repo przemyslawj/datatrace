@@ -28,49 +28,14 @@ public:
   double sparsity;
   
   MfrModel(NumericVector& occupancyMap,
-                    NumericVector& fr,
-                    double mfr,
-                    double min_trace,
-                    double sparsity) {
+           NumericVector& fr,
+           double mfr,
+           double min_trace,
+           double sparsity) {
     this->occupancyMap = occupancyMap;
     this->fr = fr;
     this->mfr = mfr;
     this->min_trace = min_trace;
-    this->sparsity = sparsity;
-  }
-};
-
-class SpatialInfoData {
-public:
-  NumericVector occupancyMap;
-  NumericVector fr;
-  double mfr = 0.0;
-  double SI = 0.0;
-  double MI = 0.0;
-  double MI_bias = 0.0;
-  double space_sampling_factor = 0.0;
-  double sparsity = 0.0;
-
-  SpatialInfoData() {
-    occupancyMap = NumericVector(1, 0.0);
-    fr = NumericVector(1, 0.0);
-  }
-
-  SpatialInfoData(NumericVector& occupancyMap,
-                  NumericVector& fr,
-                  double mfr,
-                  double SI,
-                  double MI,
-                  double MI_bias,
-                  double space_sampling_factor,
-                  double sparsity) {
-    this->occupancyMap = occupancyMap;
-    this->fr = fr;
-    this->mfr = mfr;
-    this->SI = SI;
-    this->MI = MI;
-    this->MI_bias = MI_bias;
-    this->space_sampling_factor = space_sampling_factor;
     this->sparsity = sparsity;
   }
 };
@@ -88,7 +53,7 @@ public:
 MfrModel createMfrModel(IntegerVector& bin_xy,
                         int nstim,
                         NumericVector& trace,
-                        double minOccupancy) {
+                        int minOccupancy) {
   NumericVector totalActivityMap = NumericVector(nstim, 0.0);
   NumericVector occupancyMap = NumericVector(nstim, 0.0);
   NumericVector fr = NumericVector(nstim, 0.0);
@@ -125,7 +90,7 @@ MfrModel createMfrModel(IntegerVector& bin_xy,
 SEXP create_mfr_model(IntegerVector& bin_xy,
                       int nstim,
                       NumericVector& trace,
-                      double minOccupancy) {
+                      int minOccupancy) {
   MfrModel mfrModel = createMfrModel(bin_xy, nstim, trace, minOccupancy);
   List res;
   res["occupancyMap"] = mfrModel.occupancyMap;
@@ -169,48 +134,25 @@ double calculateSI(MfrModel mfrModel, int minOccupancy, int N) {
   return SI;
 }
 
-SpatialInfoData calculateSpatialInformation(IntegerVector& bin_xy,
-                                            int nstim,
-                                            NumericVector& trace,
-                                            NumericVector& binnedTrace,
-                                            int nresponse,
-                                            double minOccupancy) {
 
-  const int N = trace.size();
-  MfrModel mfrModel = createMfrModel(bin_xy, nstim, trace, minOccupancy);
-  double SI = calculateSI(mfrModel, minOccupancy, N);
-  
-  BinnedResponseModel m = createResponseModel(binnedTrace, nresponse, bin_xy, nstim);
-  MI_Data miData = modelMutualInfo(m);
-  
+double getSpaceSamplingFactor(MfrModel& mfrModel, int nstim, int minOccupancy) {
   int occupiedBins = 0;
   for (int xy = 0; xy < nstim; ++xy) {
     if (mfrModel.occupancyMap[xy] >= minOccupancy) {
       ++occupiedBins;
     }
   }
-
-  Debug("MFR=" << mfrModel.mfr);
-  Debug(",N=" << N);
-  Debug(", MI_bias=" << miData.MI_bias <<std::endl);
-  double space_sampling_factor = ((double) occupiedBins) / nstim;
-  return SpatialInfoData(mfrModel.occupancyMap, mfrModel.fr, mfrModel.mfr, 
-                         SI, miData.MI, miData.MI_bias, space_sampling_factor, 
-                         mfrModel.sparsity);
+  
+  return ((double) occupiedBins) / nstim;
 }
+
 
 // [[Rcpp::export]]
 SEXP calcPlaceField(IntegerVector& bin_xy,
                     int nstim,
                     NumericVector& trace,
                     NumericVector& binnedTrace,
-                    IntegerVector& trialEnds,
-                    int nshuffles,
-                    int shuffleChunkLength,
-                    double minOccupancy) {
-
-  NumericVector shuffleSI = NumericVector(nshuffles, 0.0);
-  NumericVector shuffleMI = NumericVector(nshuffles, 0.0);
+                    int minOccupancy) {
 
   List result;
   result["field"] = NumericVector(nstim, 0.0);
@@ -219,8 +161,6 @@ SEXP calcPlaceField(IntegerVector& bin_xy,
   result["spatial.information.perspike"] = 0.0;
   result["field.size.50"] = 0;
   result["field.size.25"] = 0;
-  result["shuffle.si"]= shuffleSI;
-  result["shuffle.mi"]= shuffleMI;
   result["space.sampling.factor"] = 0.0;
   result["sparsity"] = 0.0;
 
@@ -229,11 +169,12 @@ SEXP calcPlaceField(IntegerVector& bin_xy,
   }
   int nresponse = (int) *(std::max_element(binnedTrace.cbegin(), binnedTrace.cend()));
 
-  SpatialInfoData spatialInfoData = calculateSpatialInformation(bin_xy, nstim, 
-                                                                trace, binnedTrace, 
-                                                                nresponse, minOccupancy);
-  NumericVector occupancyMap = spatialInfoData.occupancyMap;
-  NumericVector fr = spatialInfoData.fr;
+  MfrModel mfrModel = createMfrModel(bin_xy, nstim, trace, minOccupancy);
+  double SI = calculateSI(mfrModel, minOccupancy, trace.size());
+  double space_sampling_factor = getSpaceSamplingFactor(mfrModel, nstim, minOccupancy);
+  Debug("MFR=" << mfrModel.mfr);
+  NumericVector occupancyMap = mfrModel.occupancyMap;
+  NumericVector fr = mfrModel.fr;
 
   double maxField = 0.0;
   for (int xy = 0; xy < nstim; ++xy) {
@@ -257,51 +198,77 @@ SEXP calcPlaceField(IntegerVector& bin_xy,
     }
   }
 
-  for (int i = 0; i < nshuffles; ++i) {
-    //NumericVector shuffledTrace = chunkShuffle(trace, trialEnds, shuffleChunkLength);
-    NumericVector shuffledTrace = randomShift(trace, trialEnds, shuffleChunkLength * 2);
-    NumericVector shuffledBinnedTrace = randomShift(binnedTrace, trialEnds, shuffleChunkLength * 2);
-    SpatialInfoData shuffleData = calculateSpatialInformation(bin_xy, nstim, 
-                                                              shuffledTrace, shuffledBinnedTrace, 
-                                                              nresponse, minOccupancy);
-    shuffleSI[i] = shuffleData.SI;
-    shuffleMI[i] = shuffleData.MI;
-  }
-
+  BinnedResponseModel m = createResponseModel(binnedTrace, nresponse, bin_xy, nstim);
+  MI_Data miData = modelMutualInfo(m);
+  Debug(", MI_bias=" << miData.MI_bias <<std::endl);
 
   // Populate the result list
   result["field"] = fr;
   result["occupancy"] = occupancyMap;
-  result["spatial.information"] = (float) spatialInfoData.SI;
-  result["spatial.information.perspike"] = spatialInfoData.SI / spatialInfoData.mfr;
-  result["mfr"] = spatialInfoData.mfr;
+  result["spatial.information"] = (float) SI;
+  result["spatial.information.perspike"] = SI / mfrModel.mfr;
+  result["mfr"] = mfrModel.mfr;
   result["field.size.50"] = ((double) nFieldBins50) / nstim * 100.0;
   result["field.size.25"] = ((double) nFieldBins25) / nstim * 100.0;
-  result["shuffle.si"] = shuffleSI;
-  result["mutual.info"] = spatialInfoData.MI;
-  result["mutual.info.bias"] = spatialInfoData.MI_bias;
-  result["shuffle.mi"] = shuffleMI;
-  result["space.sampling.factor"] = spatialInfoData.space_sampling_factor;
-  result["sparsity"] = spatialInfoData.sparsity;
+  result["mutual.info"] = miData.MI;
+  result["mutual.info.bias"] = miData.MI_bias;
+  result["space.sampling.factor"] = space_sampling_factor;
+  result["sparsity"] = mfrModel.sparsity;
   return(result);
 }
 
+
+// [[Rcpp::export]]
+SEXP placeFieldStatsForShuffled(IntegerVector& bin_xy,
+                                int nstim,
+                                NumericVector& trace,
+                                NumericVector& binnedTrace,
+                                IntegerVector& trialEnds,
+                                int nshuffles,
+                                int minShift,
+                                int minOccupancy) {
+  NumericVector shuffleSI = NumericVector(nshuffles, 0.0);
+  NumericVector shuffleMI = NumericVector(nshuffles, 0.0);
+  
+  List result;
+  result["shuffle.si"]= shuffleSI;
+  result["shuffle.mi"]= shuffleMI;
+  int nresponse = (int) *(std::max_element(binnedTrace.cbegin(), binnedTrace.cend()));
+  for (int i = 0; i < nshuffles; ++i) {
+    //NumericVector shuffledTrace = chunkShuffle(trace, trialEnds, shuffleChunkLength);
+    NumericVector shuffledTrace = randomShift(trace, trialEnds, minShift);
+    MfrModel mfrModel = createMfrModel(bin_xy, nstim, shuffledTrace, minOccupancy);
+    double SI = calculateSI(mfrModel, minOccupancy, shuffledTrace.size());
+
+    NumericVector shuffledBinnedTrace = randomShift(binnedTrace, trialEnds, minShift);
+    BinnedResponseModel m = createResponseModel(shuffledBinnedTrace, nresponse, bin_xy, nstim);
+    MI_Data miData = modelMutualInfo(m);
+
+    shuffleSI[i] = SI;
+    shuffleMI[i] = miData.MI;
+  }
+  
+  result["shuffle.si"] = shuffleSI;
+  result["shuffle.mi"] = shuffleMI;
+  return result;
+}
 
 // You can include R code blocks in C++ files processed with sourceCpp
 // (useful for testing and development). The R code will be automatically
 // run after the compilation.
 //
 /*** R
-xy =  c(1, 2, 3, 4, 5, 5, 4, 3)
-binnedTrace=c(0, 0, 0, 1, 1, 0, 1, 0)
+xy =        c(1, 2, 3, 4, 5, 5, 4, 3)
+binnedTrace=c(0, 0, 0, 1, 0, 0, 1, 0)
 trace = binnedTrace / 2
 
-pf = calcPlaceField(xy, 6, trace, binnedTrace + 1, c(7, length(trace)), 0, 2, 1)
+pf = calcPlaceField(xy, 6, trace, binnedTrace + 1, 1)
 #pf=with(cell.df, getCppPlaceField(smooth_trans_x, smooth_trans_y, deconv_trace, traceQuantiles, 10,2), 4)
 pf$spatial.information
 pf$mutual.info
 pf$mfr
 
-calcPlaceField(xy, 3, trace, binnedTrace + 1, c(7, length(trace)), 0, 2, 1)
+shuffle.pf = placeFieldStatsForShuffled(xy, 6, trace, binnedTrace + 1, c(4, length(trace)), 3, 1, 1)
+shuffle.pf
 */
 

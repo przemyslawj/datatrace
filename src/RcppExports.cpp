@@ -89,7 +89,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // create_mfr_model
-SEXP create_mfr_model(IntegerVector& bin_xy, int nstim, NumericVector& trace, double minOccupancy);
+SEXP create_mfr_model(IntegerVector& bin_xy, int nstim, NumericVector& trace, int minOccupancy);
 RcppExport SEXP _datatrace_create_mfr_model(SEXP bin_xySEXP, SEXP nstimSEXP, SEXP traceSEXP, SEXP minOccupancySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -97,14 +97,29 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerVector& >::type bin_xy(bin_xySEXP);
     Rcpp::traits::input_parameter< int >::type nstim(nstimSEXP);
     Rcpp::traits::input_parameter< NumericVector& >::type trace(traceSEXP);
-    Rcpp::traits::input_parameter< double >::type minOccupancy(minOccupancySEXP);
+    Rcpp::traits::input_parameter< int >::type minOccupancy(minOccupancySEXP);
     rcpp_result_gen = Rcpp::wrap(create_mfr_model(bin_xy, nstim, trace, minOccupancy));
     return rcpp_result_gen;
 END_RCPP
 }
 // calcPlaceField
-SEXP calcPlaceField(IntegerVector& bin_xy, int nstim, NumericVector& trace, NumericVector& binnedTrace, IntegerVector& trialEnds, int nshuffles, int shuffleChunkLength, double minOccupancy);
-RcppExport SEXP _datatrace_calcPlaceField(SEXP bin_xySEXP, SEXP nstimSEXP, SEXP traceSEXP, SEXP binnedTraceSEXP, SEXP trialEndsSEXP, SEXP nshufflesSEXP, SEXP shuffleChunkLengthSEXP, SEXP minOccupancySEXP) {
+SEXP calcPlaceField(IntegerVector& bin_xy, int nstim, NumericVector& trace, NumericVector& binnedTrace, int minOccupancy);
+RcppExport SEXP _datatrace_calcPlaceField(SEXP bin_xySEXP, SEXP nstimSEXP, SEXP traceSEXP, SEXP binnedTraceSEXP, SEXP minOccupancySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerVector& >::type bin_xy(bin_xySEXP);
+    Rcpp::traits::input_parameter< int >::type nstim(nstimSEXP);
+    Rcpp::traits::input_parameter< NumericVector& >::type trace(traceSEXP);
+    Rcpp::traits::input_parameter< NumericVector& >::type binnedTrace(binnedTraceSEXP);
+    Rcpp::traits::input_parameter< int >::type minOccupancy(minOccupancySEXP);
+    rcpp_result_gen = Rcpp::wrap(calcPlaceField(bin_xy, nstim, trace, binnedTrace, minOccupancy));
+    return rcpp_result_gen;
+END_RCPP
+}
+// placeFieldStatsForShuffled
+SEXP placeFieldStatsForShuffled(IntegerVector& bin_xy, int nstim, NumericVector& trace, NumericVector& binnedTrace, IntegerVector& trialEnds, int nshuffles, int minShift, int minOccupancy);
+RcppExport SEXP _datatrace_placeFieldStatsForShuffled(SEXP bin_xySEXP, SEXP nstimSEXP, SEXP traceSEXP, SEXP binnedTraceSEXP, SEXP trialEndsSEXP, SEXP nshufflesSEXP, SEXP minShiftSEXP, SEXP minOccupancySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -114,9 +129,9 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericVector& >::type binnedTrace(binnedTraceSEXP);
     Rcpp::traits::input_parameter< IntegerVector& >::type trialEnds(trialEndsSEXP);
     Rcpp::traits::input_parameter< int >::type nshuffles(nshufflesSEXP);
-    Rcpp::traits::input_parameter< int >::type shuffleChunkLength(shuffleChunkLengthSEXP);
-    Rcpp::traits::input_parameter< double >::type minOccupancy(minOccupancySEXP);
-    rcpp_result_gen = Rcpp::wrap(calcPlaceField(bin_xy, nstim, trace, binnedTrace, trialEnds, nshuffles, shuffleChunkLength, minOccupancy));
+    Rcpp::traits::input_parameter< int >::type minShift(minShiftSEXP);
+    Rcpp::traits::input_parameter< int >::type minOccupancy(minOccupancySEXP);
+    rcpp_result_gen = Rcpp::wrap(placeFieldStatsForShuffled(bin_xy, nstim, trace, binnedTrace, trialEnds, nshuffles, minShift, minOccupancy));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -169,7 +184,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_datatrace_mutual_info", (DL_FUNC) &_datatrace_mutual_info, 4},
     {"_datatrace_mutual_info_with_shuffles", (DL_FUNC) &_datatrace_mutual_info_with_shuffles, 7},
     {"_datatrace_create_mfr_model", (DL_FUNC) &_datatrace_create_mfr_model, 4},
-    {"_datatrace_calcPlaceField", (DL_FUNC) &_datatrace_calcPlaceField, 8},
+    {"_datatrace_calcPlaceField", (DL_FUNC) &_datatrace_calcPlaceField, 5},
+    {"_datatrace_placeFieldStatsForShuffled", (DL_FUNC) &_datatrace_placeFieldStatsForShuffled, 8},
     {"_datatrace_isRunning", (DL_FUNC) &_datatrace_isRunning, 4},
     {"_datatrace_chunkShuffle", (DL_FUNC) &_datatrace_chunkShuffle, 3},
     {"_datatrace_randomShift", (DL_FUNC) &_datatrace_randomShift, 3},

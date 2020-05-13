@@ -22,7 +22,7 @@ create.pf.df = function(M, occupancyM, min.occupancy.sec=1, frame.rate=20, sigma
   df_org = reshape2::melt(smoothedOccupancy) %>%
     dplyr::filter(value >= min.smoothed.occupancy) %>%
     dplyr::filter(.norm2(Var1 - mid.pt, Var2 - mid.pt) <= mid.pt)
-  df2 = left_join(df_org, df1, by=c('Var1'='Var1', 'Var2'='Var2'), suffix=c('.occupancy', '.conv'))
+  df2 = left_join(df_org, df1, by=c('Var1'='Var1', 'Var2'='Var2'), suffix=c('.occupancy', '.field'))
   
   return(df2)
 }
@@ -31,7 +31,7 @@ plot.pf = function(df, max.x, max.y) {
   jet.colours = colorRampPalette(c("#00007F", "blue", "#007FFF", "cyan", "#7FFF7F", "yellow", "#FF7F00", "red", "#7F0000"))
   
   ggplot(df, aes(x=Var1, y=max.y-Var2)) +
-    geom_raster(aes(fill=value.conv), interpolate=FALSE) +
+    geom_raster(aes(fill=value.field), interpolate=FALSE) +
     scale_fill_gradientn(colours=jet.colours(7)) +
     xlim(c(0, max.x)) + ylim(c(0, max.y)) +
     theme_void() 
@@ -70,21 +70,21 @@ field.cor = function(field1, field2, max.xy, make.cor.plot=FALSE) {
   joined.fields = inner_join(field1, field2, by=c('Var1', 'Var2')) %>%
     # Avoid calculating correlation on the edges: the blue highly correlated and increases the overall correlation
     filter(Var1 < max.xy - 1, Var2 < max.xy - 1, Var1 > 2, Var2 > 2)  
-  result$cor = cor(joined.fields$value.conv.x, joined.fields$value.conv.y)
+  result$cor = cor(joined.fields$value.field.x, joined.fields$value.field.y)
   
   if (make.cor.plot) {
-    m.conv.x = mean(joined.fields$value.conv.x)
-    sd.conv.x = sd(joined.fields$value.conv.x)
-    m.conv.y = mean(joined.fields$value.conv.y)
-    sd.conv.y = sd(joined.fields$value.conv.y)
+    m.field.x = mean(joined.fields$value.field.x)
+    sd.field.x = sd(joined.fields$value.field.x)
+    m.field.y = mean(joined.fields$value.field.y)
+    sd.field.y = sd(joined.fields$value.field.y)
     
     joined.fields = mutate(
       joined.fields,
-      value.conv = (value.conv.x - m.conv.x) * (value.conv.y - m.conv.y) /
-        (nrow(joined.fields) - 1) / sd.conv.x / sd.conv.y)
+      value.field = (value.field.x - m.field.x) * (value.field.y - m.field.y) /
+        (nrow(joined.fields) - 1) / sd.field.x / sd.field.y)
     
     g = ggplot(joined.fields) +
-      geom_raster(aes(x=Var1, y=max.xy-Var2, fill=value.conv), interpolate=FALSE) +
+      geom_raster(aes(x=Var1, y=max.xy-Var2, fill=value.field), interpolate=FALSE) +
       scale_fill_gradient2(low = 'blue', mid = 'white', high='red', midpoint = 0.0) +
       xlim(c(0, max.xy)) + ylim(c(0, max.xy)) +
       theme_void()
@@ -101,6 +101,7 @@ cell.spatial.info = function(cell.df,
                              generate.plots=FALSE, 
                              nshuffles=0,
                              bin.hz=5,
+                             shuffle.shift.sec=20,
                              trace.var='trace',
                              binned.trace.var='response_bin',
                              min.occupancy.sec=1) {
@@ -124,16 +125,22 @@ cell.spatial.info = function(cell.df,
                       nstim,
                       trace.vals,
                       cell.df[[binned.trace.var]],
-                      as.integer(trial_ends), 
-                      nshuffles,
-                      2 * bin.hz,
-                      min.occupancy.sec * bin.hz) # min occupancy
+                      min.occupancy.sec * bin.hz)
   pf.field = .to.matrix(pf$field, nstim.x, nstim.y)
   pf.occupancy = .to.matrix(pf$occupancy, nstim.x, nstim.y)
 
-  si.signif.thresh = quantile(pf$shuffle.si, 0.95, na.rm=TRUE)[[1]]
+  
+  shuffle.pf = placeFieldStatsForShuffled(as.integer(to_1dim(cell.df$bin.x, cell.df$bin.y, nstim.y)), 
+                             nstim,
+                             trace.vals,
+                             cell.df[[binned.trace.var]],
+                             as.integer(trial_ends), 
+                             nshuffles,
+                             shuffle.shift.sec * bin.hz,
+                             min.occupancy.sec * bin.hz) # min occupancy
+  si.signif.thresh = quantile(shuffle.pf$shuffle.si, 0.95, na.rm=TRUE)[[1]]
   si.signif = pf$spatial.information >= si.signif.thresh
-  mi.signif.thresh = quantile(pf$shuffle.mi, 0.95, na.rm=TRUE)[[1]]
+  mi.signif.thresh = quantile(shuffle.pf$shuffle.mi, 0.95, na.rm=TRUE)[[1]]
   mi.signif = pf$mutual.info >= mi.signif.thresh
 
   cell_info = list(cell_id=cell_name,
@@ -157,12 +164,12 @@ cell.spatial.info = function(cell.df,
   # find field max value and pos in the smoothed values
   pf.df = create.pf.df(pf.field, pf.occupancy, frame.rate=bin.hz)
   if (nrow(pf.df) > 0) {
-    max.row = pf.df[which.max(pf.df$value.conv),]
+    max.row = pf.df[which.max(pf.df$value.field),]
   } else { # no bin with high enough occupancy
-    max.row=list(value.conv=0, Var1=-1, Var2=-1)
+    max.row=list(value.field=0, Var1=-1, Var2=-1)
   }
-  cell_info$field.max = max.row$value.conv
-  cell_info$field.mean = mean(pf.df$value.conv)
+  cell_info$field.max = max.row$value.field
+  cell_info$field.mean = mean(pf.df$value.field)
   cell_info$field.max.x = max.row$Var1 / nstim.x * 100
   cell_info$field.max.y = max.row$Var2/ nstim.y * 100
   
