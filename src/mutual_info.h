@@ -20,7 +20,7 @@ struct MI_Data {
 
 class BinnedResponseModel {
 public:
-  NumericMatrix prob_r_given_s;
+  arma::mat prob_r_given_s;
   NumericVector prob_response;
   NumericVector prob_stim;
   int nstim;
@@ -28,10 +28,19 @@ public:
   int N;
 };
 
-BinnedResponseModel createResponseModel(NumericVector& response, 
-                                        int nresponseBins,
-                                        IntegerVector& stimulus, 
-                                        int nstim);
-MI_Data modelMutualInfo(BinnedResponseModel& m);
+class BinnedResponseModel2D : public BinnedResponseModel {
+public:
+  // Cube  (response x stim_x x stim_y) of probabilities
+  arma::cube prob_r_given_xy;
+  arma::mat prob_stim_xy;
+};
+
+BinnedResponseModel2D create2DResponseModel(NumericVector& response, 
+                                            int nresponseBins,
+                                            IntegerVector& stimulus_x, 
+                                            IntegerVector& stimulus_y, 
+                                            int nstim_x,
+                                            int nstim_y);
+MI_Data modelMutualInfo(BinnedResponseModel2D& m);
 
 #endif

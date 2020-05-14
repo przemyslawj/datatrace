@@ -121,23 +121,18 @@ cell.spatial.info = function(cell.df,
   trace.quantiles = quantile(trace.vals, c(0.2, 0.99, 1.0), na.rm=TRUE)
 
   nstim = nstim.x * nstim.y
-  pf = calcPlaceField(as.integer(to_1dim(cell.df$bin.x, cell.df$bin.y, nstim.y)), 
-                      nstim,
+  pf = calcPlaceField(cell.df$bin.x, cell.df$bin.y, nstim.x, nstim.y, 
                       trace.vals,
                       cell.df[[binned.trace.var]],
                       min.occupancy.sec * bin.hz)
-  pf.field = .to.matrix(pf$field, nstim.x, nstim.y)
-  pf.occupancy = .to.matrix(pf$occupancy, nstim.x, nstim.y)
-
   
-  shuffle.pf = placeFieldStatsForShuffled(as.integer(to_1dim(cell.df$bin.x, cell.df$bin.y, nstim.y)), 
-                             nstim,
-                             trace.vals,
-                             cell.df[[binned.trace.var]],
-                             as.integer(trial_ends), 
-                             nshuffles,
-                             shuffle.shift.sec * bin.hz,
-                             min.occupancy.sec * bin.hz) # min occupancy
+  shuffle.pf = placeFieldStatsForShuffled(cell.df$bin.x, cell.df$bin.y, nstim.x, nstim.y, 
+                                          trace.vals,
+                                          cell.df[[binned.trace.var]],
+                                          as.integer(trial_ends), 
+                                          nshuffles,
+                                          shuffle.shift.sec * bin.hz,
+                                          min.occupancy.sec * bin.hz) # min occupancy
   si.signif.thresh = quantile(shuffle.pf$shuffle.si, 0.95, na.rm=TRUE)[[1]]
   si.signif = pf$spatial.information >= si.signif.thresh
   mi.signif.thresh = quantile(shuffle.pf$shuffle.mi, 0.95, na.rm=TRUE)[[1]]
@@ -162,7 +157,7 @@ cell.spatial.info = function(cell.df,
                    nevents=cell.nevents)
 
   # find field max value and pos in the smoothed values
-  pf.df = create.pf.df(pf.field, pf.occupancy, frame.rate=bin.hz)
+  pf.df = create.pf.df(pf$field, pf$occupancy, frame.rate=bin.hz)
   if (nrow(pf.df) > 0) {
     max.row = pf.df[which.max(pf.df$value.field),]
   } else { # no bin with high enough occupancy
@@ -191,7 +186,7 @@ cell.spatial.info = function(cell.df,
   }
 
   return(list(cell_info=cell_info,
-             field=pf.field,
-             occupancy=pf.occupancy,
+             field=pf$field,
+             occupancy=pf$occupancy,
              g=g.placefield))
 }

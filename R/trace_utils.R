@@ -89,6 +89,8 @@ timebin.traces = function(data.traces, timebin.dur.msec=200) {
   timebinned.traces
 }
 
+# Bins data.traces[[stim.var]] values, by dividing the into bins of bin.width.
+# Bins are indexed from 1.
 stimbin.traces = function(data.traces, stim.var, bin.width) {
   if (nrow(data.traces) == 0) {
     return(data.traces)
@@ -97,18 +99,17 @@ stimbin.traces = function(data.traces, stim.var, bin.width) {
 
   bin.var.name = paste0('bin.', quo_name(stim.var))
   data.traces %>%
-    dplyr::mutate(!!bin.var.name := as.integer(floor(!!stim.var / bin.width)))
+    dplyr::mutate(!!bin.var.name := as.integer(ceiling(!!stim.var / bin.width)))
 }
 
 
 to_1dim = function(x, y, nbins.y) {
   # Vals from 1 to xybins * xybins
-  as.integer(nbins.y * x + y + 1)
+  as.integer(nbins.y * (x-1) + y)
 }
 
 from_1dim = function(z, nbins.y) {
-  z = z - 1
-  list(x=as.integer(floor(z/nbins.y)), y=z%%nbins.y)
+  list(x=as.integer(ceiling(z/nbins.y)), y=(z-1)%%nbins.y + 1)
 }
 
 get.quantiles.fun = function(quantile.fractions) {

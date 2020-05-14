@@ -25,16 +25,16 @@ mutual_info_with_shuffles <- function(response, nresponseBins, stimulus, nstim, 
     .Call(`_datatrace_mutual_info_with_shuffles`, response, nresponseBins, stimulus, nstim, trialEnds, nshuffles, shuffleChunkLength)
 }
 
-create_mfr_model <- function(bin_xy, nstim, trace, minOccupancy) {
-    .Call(`_datatrace_create_mfr_model`, bin_xy, nstim, trace, minOccupancy)
+create_mfr_model <- function(bin_x, bin_y, nbins_x, nbins_y, trace, minOccupancy) {
+    .Call(`_datatrace_create_mfr_model`, bin_x, bin_y, nbins_x, nbins_y, trace, minOccupancy)
 }
 
-calcPlaceField <- function(bin_xy, nstim, trace, binnedTrace, minOccupancy) {
-    .Call(`_datatrace_calcPlaceField`, bin_xy, nstim, trace, binnedTrace, minOccupancy)
+calcPlaceField <- function(bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, minOccupancy) {
+    .Call(`_datatrace_calcPlaceField`, bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, minOccupancy)
 }
 
-placeFieldStatsForShuffled <- function(bin_xy, nstim, trace, binnedTrace, trialEnds, nshuffles, minShift, minOccupancy) {
-    .Call(`_datatrace_placeFieldStatsForShuffled`, bin_xy, nstim, trace, binnedTrace, trialEnds, nshuffles, minShift, minOccupancy)
+placeFieldStatsForShuffled <- function(bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, trialEnds, nshuffles, minShift, minOccupancy) {
+    .Call(`_datatrace_placeFieldStatsForShuffled`, bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, trialEnds, nshuffles, minShift, minOccupancy)
 }
 
 isRunning <- function(df, min_run_velocity, mean_run_velocity, window_dur_ms) {

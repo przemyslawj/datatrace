@@ -11,18 +11,18 @@
  */
 MI_Data stimulus_mutual_info(double p_stim, 
                              NumericVector& p_response,
-                             const NumericMatrix::Row& p_r_given_s) {
+                             arma::vec p_r_given_s) {
   int totalResponseBins = 0;
   double MI = 0.0;
   for (int r = 0; r < p_response.size(); ++r) {
     
     Debug("response=" << r);
     Debug(", p_stim=" << p_stim);
-    Debug(", p_r_given_s=" << p_r_given_s[r]);
+    Debug(", p_r_given_s=" << p_r_given_s(r));
     Debug(", p_response=" << p_response[r]);
     if (p_r_given_s[r] > 0) {
       ++totalResponseBins;
-      double r_MI = p_stim * p_r_given_s[r] * std::log2(p_r_given_s[r] / p_response[r]);
+      double r_MI = p_stim * p_r_given_s(r) * std::log2(p_r_given_s(r) / p_response[r]);
       Debug(", MI=" << r_MI);
       MI += r_MI;
     }
@@ -72,74 +72,79 @@ int max_s_given_r(int r, int N,
 */
 
 
-BinnedResponseModel createResponseModel(NumericVector& response, 
-                                        int nresponseBins,
-                                        IntegerVector& stimulus, 
-                                        int nstim) {
-
-  arma::mat r_given_s(nstim, nresponseBins, arma::fill::zeros);
+BinnedResponseModel2D create2DResponseModel(NumericVector& response, 
+                                            int nresponseBins,
+                                            IntegerVector& stimulus_x, 
+                                            IntegerVector& stimulus_y, 
+                                            int nstim_x,
+                                            int nstim_y) {
+  
+  arma::cube r_given_s(nresponseBins, nstim_x, nstim_y, arma::fill::zeros);
   std::vector<int> r_counts(nresponseBins, 0);
-  std::vector<int> s_counts(nstim, 0);
-
+  arma::mat s_counts(nstim_x, nstim_y, arma::fill::zeros);
+  
   for (int i = 0; i < response.size(); ++i) {
     int responseBin = std::max(0, (int) response[i] - 1);
-    int stimBin = std::max(0, stimulus[i] - 1);
-    if (stimBin >= nstim) {
+    int stim_x = std::max(0, stimulus_x[i] - 1);
+    int stim_y = std::max(0, stimulus_y[i] - 1);
+    if (stim_x >= nstim_x || stim_y >= nstim_y) {
       stop("Stim value higher than the number of bins");
     }
     if (responseBin >= nresponseBins) {
       stop("Response value higher than the number of bins");
     }
     
-    ++s_counts[stimBin];
-    ++r_given_s(stimBin, responseBin);
+    ++s_counts(stim_x, stim_y);
+    ++r_given_s(responseBin, stim_x, stim_y);
     ++r_counts[responseBin];
   }  
-
+  
   int N = response.size(); 
   
   // Set probabilities
-  BinnedResponseModel m = BinnedResponseModel();
-  NumericVector p_stim(nstim, 0.0);
+  BinnedResponseModel2D m = BinnedResponseModel2D();
   NumericVector p_response(nresponseBins, 0.0);
-  NumericMatrix p_r_given_s(nstim, nresponseBins);
-  std::fill(p_r_given_s.begin(), p_r_given_s.end(), 0.0);
+  arma::mat prob_stim_xy(nstim_x, nstim_y, arma::fill::zeros);
+  arma::cube prob_r_given_xy(nresponseBins, nstim_x, nstim_y, arma::fill::zeros);
   
   for (int r = 0; r < nresponseBins; ++r) {
     p_response[r] = ((double) r_counts[r]) / N;
-    for (int s = 0; s < nstim; ++s) {
-      p_stim[s] = ((double) s_counts[s]) / N;
-      // TODO? :+1 every bin to have >0 probabilities of unssen bins
-      p_r_given_s(s,r) = ((double) r_given_s(s,r)) / s_counts[s];
+    for (int x = 0; x < nstim_x; ++x) {
+      for (int y = 0; y < nstim_y; ++y) {
+        prob_stim_xy(x,y) = ((double) s_counts(x,y)) / N;
+        // TODO? :+1 every bin to have >0 probabilities of unssen bins
+        prob_r_given_xy(r,x,y) = ((double) r_given_s(r,x,y)) / s_counts(x,y);
+      }
     }
   }
   
-  m.prob_stim = p_stim;
+  m.prob_stim_xy = prob_stim_xy;
   m.prob_response = p_response;
-  m.prob_r_given_s = p_r_given_s;
-  m.nstim = nstim;
+  m.prob_r_given_xy = prob_r_given_xy;
   m.nresponse = nresponseBins;
   m.N = response.size();
   return m;
 }
 
-MI_Data modelMutualInfo(BinnedResponseModel& m) {
+MI_Data modelMutualInfo(BinnedResponseModel2D& m) {
   int totalResponseBins = 0;
   int totalStimuliBins = 0;
   double MI = 0.0;
-  for (int s = 0; s < m.nstim; ++s) {
-    double p_stim = m.prob_stim[s];
-    if (p_stim > 0) {
-      ++totalStimuliBins;
-      
-      MI_Data mi_Data = stimulus_mutual_info(p_stim, 
-                                             m.prob_response, 
-                                             m.prob_r_given_s.row(s));
-      MI += mi_Data.MI;
-      totalResponseBins += mi_Data.totalResponseBins;
+  for (int y = 0; y < m.prob_stim_xy.n_cols; ++y) {
+    arma::mat prob_r_given_x = m.prob_r_given_xy.slice(y);
+    for (int x = 0; x < m.prob_stim_xy.n_rows; ++x) {
+      double p_stim = m.prob_stim_xy(x,y);
+      if (p_stim > 0) {
+        ++totalStimuliBins;
+        MI_Data mi_Data = stimulus_mutual_info(p_stim, 
+                                               m.prob_response, 
+                                               prob_r_given_x.col(x));
+        MI += mi_Data.MI;
+        totalResponseBins += mi_Data.totalResponseBins;
+      }
     }
   }
-
+  
   // Mutual information bias estimate from: Analytical estimates of limited sampling biases in different
   // information measures, Panzeri & Treves, 1996.
   Debug("totalresponseBins=" << totalResponseBins << ", nresponseBins=" << m.nresponse << ", totalStimuliBins=" << totalStimuliBins << std::endl);
@@ -166,7 +171,10 @@ SEXP mutual_info(NumericVector& response,
     return result;
   }
   
-  BinnedResponseModel m = createResponseModel(response, nresponseBins, stimulus, nstim);
+  IntegerVector stimulus_y(stimulus.size(), 1);
+  Debug("Creating model" << std::endl);
+  BinnedResponseModel2D m = create2DResponseModel(response, nresponseBins, stimulus, stimulus_y, nstim, 1);
+  Debug("Calculating mutual info" << std::endl);
   MI_Data miData = modelMutualInfo(m);
   
   
@@ -208,6 +216,7 @@ SEXP mutual_info_with_shuffles(NumericVector& response,
 # Perfect mutual info
 response = c(c(1, 2, 1, 2, 2), rep(1, 10))
 stimulus = c(c(1, 2, 1, 2, 2), rep(1, 10))
+res = mutual_info(response, 2, stimulus, 2)
 res = mutual_info_with_shuffles(response, 2, stimulus, 2, c(1, 10), 1, 2)
 res$mutual.info
 res$mutual.info.bias
