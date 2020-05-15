@@ -17,24 +17,28 @@ bayesmax_mfr <- function(prior, mfr, pv) {
     .Call(`_datatrace_bayesmax_mfr`, prior, mfr, pv)
 }
 
-mutual_info <- function(response, nresponseBins, stimulus, nstim) {
-    .Call(`_datatrace_mutual_info`, response, nresponseBins, stimulus, nstim)
+mutual_info <- function(response, nresponseBins, stimulus, nstim, minStimOccurrence) {
+    .Call(`_datatrace_mutual_info`, response, nresponseBins, stimulus, nstim, minStimOccurrence)
 }
 
-mutual_info_with_shuffles <- function(response, nresponseBins, stimulus, nstim, trialEnds, nshuffles, shuffleChunkLength) {
-    .Call(`_datatrace_mutual_info_with_shuffles`, response, nresponseBins, stimulus, nstim, trialEnds, nshuffles, shuffleChunkLength)
+mutual_info_with_shuffles <- function(response, nresponseBins, stimulus, nstim, trialEnds, nshuffles, shuffleChunkLength, minStimOccurrence) {
+    .Call(`_datatrace_mutual_info_with_shuffles`, response, nresponseBins, stimulus, nstim, trialEnds, nshuffles, shuffleChunkLength, minStimOccurrence)
 }
 
 create_mfr_model <- function(bin_x, bin_y, nbins_x, nbins_y, trace, minOccupancy) {
     .Call(`_datatrace_create_mfr_model`, bin_x, bin_y, nbins_x, nbins_y, trace, minOccupancy)
 }
 
-calcPlaceField <- function(bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, minOccupancy) {
-    .Call(`_datatrace_calcPlaceField`, bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, minOccupancy)
+calcPlaceField <- function(bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, minOccupancy, kernelSize, gaussianVar) {
+    .Call(`_datatrace_calcPlaceField`, bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, minOccupancy, kernelSize, gaussianVar)
 }
 
-placeFieldStatsForShuffled <- function(bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, trialEnds, nshuffles, minShift, minOccupancy) {
-    .Call(`_datatrace_placeFieldStatsForShuffled`, bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, trialEnds, nshuffles, minShift, minOccupancy)
+placeFieldStatsForShuffled <- function(bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, trialEnds, nshuffles, minShift, minOccupancy, kernelSize, gaussianVar) {
+    .Call(`_datatrace_placeFieldStatsForShuffled`, bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, trialEnds, nshuffles, minShift, minOccupancy, kernelSize, gaussianVar)
+}
+
+createGaussianKernel <- function(kernelSize, var) {
+    .Call(`_datatrace_createGaussianKernel`, kernelSize, var)
 }
 
 isRunning <- function(df, min_run_velocity, mean_run_velocity, window_dur_ms) {

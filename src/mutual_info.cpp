@@ -1,3 +1,4 @@
+#include "debug_utils.h"
 #include "mutual_info.h"
 #include "trace_utils.h"
 
@@ -20,7 +21,7 @@ MI_Data stimulus_mutual_info(double p_stim,
     Debug(", p_stim=" << p_stim);
     Debug(", p_r_given_s=" << p_r_given_s(r));
     Debug(", p_response=" << p_response[r]);
-    if (p_r_given_s[r] > 0) {
+    if (!std::isnan(p_r_given_s[r]) && p_r_given_s[r] > 0) {
       ++totalResponseBins;
       double r_MI = p_stim * p_r_given_s(r) * std::log2(p_r_given_s(r) / p_response[r]);
       Debug(", MI=" << r_MI);
@@ -77,7 +78,8 @@ BinnedResponseModel2D create2DResponseModel(NumericVector& response,
                                             IntegerVector& stimulus_x, 
                                             IntegerVector& stimulus_y, 
                                             int nstim_x,
-                                            int nstim_y) {
+                                            int nstim_y,
+                                            int minOccurrence) {
   
   arma::cube r_given_s(nresponseBins, nstim_x, nstim_y, arma::fill::zeros);
   std::vector<int> r_counts(nresponseBins, 0);
@@ -104,23 +106,26 @@ BinnedResponseModel2D create2DResponseModel(NumericVector& response,
   // Set probabilities
   BinnedResponseModel2D m = BinnedResponseModel2D();
   NumericVector p_response(nresponseBins, 0.0);
-  arma::mat prob_stim_xy(nstim_x, nstim_y, arma::fill::zeros);
   arma::cube prob_r_given_xy(nresponseBins, nstim_x, nstim_y, arma::fill::zeros);
   
   for (int r = 0; r < nresponseBins; ++r) {
     p_response[r] = ((double) r_counts[r]) / N;
     for (int x = 0; x < nstim_x; ++x) {
       for (int y = 0; y < nstim_y; ++y) {
-        prob_stim_xy(x,y) = ((double) s_counts(x,y)) / N;
-        // TODO? :+1 every bin to have >0 probabilities of unssen bins
-        prob_r_given_xy(r,x,y) = ((double) r_given_s(r,x,y)) / s_counts(x,y);
+        if (s_counts(x,y) < minOccurrence) {
+          prob_r_given_xy(r,x,y) = NA_REAL;
+        } else {
+          prob_r_given_xy(r,x,y) = ((double) r_given_s(r,x,y)) / s_counts(x,y);
+        }
       }
     }
+    Debug("Prob r=" << r << " before smoothing ");
   }
   
-  m.prob_stim_xy = prob_stim_xy;
+  m.count_stim_xy = s_counts;
   m.prob_response = p_response;
   m.prob_r_given_xy = prob_r_given_xy;
+  m.total_r_given_xy = r_given_s;
   m.nresponse = nresponseBins;
   m.N = response.size();
   return m;
@@ -130,12 +135,14 @@ MI_Data modelMutualInfo(BinnedResponseModel2D& m) {
   int totalResponseBins = 0;
   int totalStimuliBins = 0;
   double MI = 0.0;
-  for (int y = 0; y < m.prob_stim_xy.n_cols; ++y) {
+  for (int y = 0; y < m.count_stim_xy.n_cols; ++y) {
     arma::mat prob_r_given_x = m.prob_r_given_xy.slice(y);
-    for (int x = 0; x < m.prob_stim_xy.n_rows; ++x) {
-      double p_stim = m.prob_stim_xy(x,y);
+    for (int x = 0; x < m.count_stim_xy.n_rows; ++x) {
+      double p_stim = ((double) m.count_stim_xy(x,y)) / m.N;
       if (p_stim > 0) {
-        ++totalStimuliBins;
+        if (!std::isnan(prob_r_given_x(0,x))) { // false when stim x,y was visited
+          ++totalStimuliBins;
+        }
         MI_Data mi_Data = stimulus_mutual_info(p_stim, 
                                                m.prob_response, 
                                                prob_r_given_x.col(x));
@@ -157,11 +164,60 @@ MI_Data modelMutualInfo(BinnedResponseModel2D& m) {
   return(result);
 }
 
+BinnedResponseModel2D smooth2DResponseModel(BinnedResponseModel2D& m,
+                                            arma::mat& kernel) {
+  BinnedResponseModel2D result;
+  arma::mat smooth_count_stim_xy = conv2(m.count_stim_xy, kernel, "same");
+  int nrows = m.count_stim_xy.n_rows;
+  int ncols = m.count_stim_xy.n_cols;
+  
+  // Smooth cube values per response value
+  arma::cube smooth_total_r_given_xy(m.nresponse, nrows, ncols);
+  arma::cube smooth_prob_r_given_xy(m.nresponse, nrows, ncols);
+  for (int r = 0; r < m.nresponse; ++r) {
+    // Get matrix x by y matrix to be convolved
+    arma::mat total_xy(nrows, ncols);
+    for (int x = 0; x < nrows; ++x) {
+      for (int y = 0; y < ncols; ++y) {  
+        total_xy(x,y) = m.total_r_given_xy(r,x,y);
+      }
+    }
+    
+    arma::mat smooth_total_xy = conv2(total_xy, kernel, "same");
+    
+    Debug("Prob r=" << r << " before smoothing ");
+    printMat(total_xy);
+    
+    // Set convolved probabilities in the cube
+    for (int x = 0; x < nrows; ++x) {
+      for (int y = 0; y < ncols; ++y) {  
+        smooth_total_r_given_xy(r,x,y) = smooth_total_xy(x,y);
+        // Set NA if was before <- stim occurrence below the minOccurrence threshold
+        if (std::isnan(m.prob_r_given_xy(r,x,y))) {
+          smooth_prob_r_given_xy(r,x,y) = NA_REAL;
+        } else {
+          smooth_prob_r_given_xy(r,x,y) = smooth_total_xy(x,y) / smooth_count_stim_xy(x,y);  
+        }
+      }
+    }
+    Debug("Prob r=" << r << " after smoothing ");
+    printMat(smooth_total_xy);
+  }
+  
+  result.count_stim_xy = smooth_count_stim_xy;
+  result.prob_r_given_xy = smooth_prob_r_given_xy;
+  result.prob_response = m.prob_response;
+  result.nresponse = m.nresponse;
+  result.N = m.N;
+  return result;
+}
+
 // [[Rcpp::export]]
 SEXP mutual_info(NumericVector& response,
                  int nresponseBins,
                  IntegerVector& stimulus,
-                 int nstim) {
+                 int nstim,
+                 int minStimOccurrence) {
   List result;
   result["mutual.info"] = 0.0;
   result["mutual.info.bias"] = 0.0;
@@ -173,7 +229,7 @@ SEXP mutual_info(NumericVector& response,
   
   IntegerVector stimulus_y(stimulus.size(), 1);
   Debug("Creating model" << std::endl);
-  BinnedResponseModel2D m = create2DResponseModel(response, nresponseBins, stimulus, stimulus_y, nstim, 1);
+  BinnedResponseModel2D m = create2DResponseModel(response, nresponseBins, stimulus, stimulus_y, nstim, 1, minStimOccurrence);
   Debug("Calculating mutual info" << std::endl);
   MI_Data miData = modelMutualInfo(m);
   
@@ -191,9 +247,10 @@ SEXP mutual_info_with_shuffles(NumericVector& response,
                                int nstim,
                                IntegerVector& trialEnds,
                                int nshuffles,
-                               int shuffleChunkLength ) {
+                               int shuffleChunkLength,
+                               int minStimOccurrence) {
 
-  List result = mutual_info(response, nresponseBins, stimulus, nstim);
+  List result = mutual_info(response, nresponseBins, stimulus, nstim, minStimOccurrence);
   
   NumericVector mis(nshuffles, 0.0);
   NumericVector mis_bias(nshuffles, 0.0);
@@ -201,7 +258,7 @@ SEXP mutual_info_with_shuffles(NumericVector& response,
   for (int i = 0; i < nshuffles; ++i) {
     NumericVector shuffledResponse = chunkShuffle(response, trialEnds, shuffleChunkLength);
     Debug("Shuffled response: " << shuffledResponse << std::endl);
-    List shuffledResult = mutual_info(shuffledResponse, nresponseBins, stimulus, nstim);
+    List shuffledResult = mutual_info(shuffledResponse, nresponseBins, stimulus, nstim, minStimOccurrence);
     mis[i] = shuffledResult["mutual.info"];
     mis_bias[i] = shuffledResult["mutual.info.bias"];
   }
@@ -216,8 +273,8 @@ SEXP mutual_info_with_shuffles(NumericVector& response,
 # Perfect mutual info
 response = c(c(1, 2, 1, 2, 2), rep(1, 10))
 stimulus = c(c(1, 2, 1, 2, 2), rep(1, 10))
-res = mutual_info(response, 2, stimulus, 2)
-res = mutual_info_with_shuffles(response, 2, stimulus, 2, c(1, 10), 1, 2)
+res = mutual_info(response, 2, stimulus, 2, 1)
+res = mutual_info_with_shuffles(response, 2, stimulus, 2, c(1, 10), 3, 2, 1)
 res$mutual.info
 res$mutual.info.bias
 */

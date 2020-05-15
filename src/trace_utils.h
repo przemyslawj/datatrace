@@ -4,14 +4,6 @@
 #include <Rcpp.h>
 using namespace Rcpp;
 
-//#define USEDEBUG
-
-#ifdef USEDEBUG
-#define Debug(x) Rcout << x
-#else
-#define Debug(x)
-#endif
-
 // [[Rcpp::export]]
 NumericVector chunkShuffle(NumericVector& trace,
                            IntegerVector& trialEnds, 
@@ -21,4 +13,5 @@ NumericVector chunkShuffle(NumericVector& trace,
 NumericVector randomShift(NumericVector& trace,
                           IntegerVector& trialEnds, 
                           int minShift);
+
 #endif

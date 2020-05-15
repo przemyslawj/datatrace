@@ -91,15 +91,16 @@ timebin.traces = function(data.traces, timebin.dur.msec=200) {
 
 # Bins data.traces[[stim.var]] values, by dividing the into bins of bin.width.
 # Bins are indexed from 1.
-stimbin.traces = function(data.traces, stim.var, bin.width) {
+stimbin.traces = function(data.traces, stim.var, nbins, max.width=100) {
   if (nrow(data.traces) == 0) {
     return(data.traces)
   }
   stim.var = enquo(stim.var)
+  bin.width = max.width / nbins
 
   bin.var.name = paste0('bin.', quo_name(stim.var))
   data.traces %>%
-    dplyr::mutate(!!bin.var.name := as.integer(ceiling(!!stim.var / bin.width)))
+    dplyr::mutate(!!bin.var.name := as.integer(ceiling(pmin(!!stim.var, max.width) / bin.width)))
 }
 
 
@@ -152,8 +153,8 @@ bin.time.space = function(data.traces,
 
   timebinned.traces = timebin.traces(data.traces[x >= 0 & y >= 0, ],
                                      timebin.dur.msec = timebin.dur.msec) %>%
-    stimbin.traces(x, 100/nbins.x) %>%
-    stimbin.traces(y, 100/nbins.y) %>%
+    stimbin.traces(x, nbins.x) %>%
+    stimbin.traces(y, nbins.y) %>%
     data.table()
   if (!is.null(get.bin.thresholds.fun)) {
     binned.traces = bin.responses(timebinned.traces, get.bin.thresholds.fun, binned.var=binned.var)

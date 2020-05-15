@@ -2,13 +2,6 @@
   sqrt(x**2 + y**2)
 }
 
-.to.matrix = function(M, nstim.x, nstim.y) {
-  if (!is.matrix(M)) {
-    M = matrix(M, nrow=nstim.x, ncol=nstim.y, byrow=TRUE) 
-  }
-  return(M)
-}
-
 # Create df with smoothed values from matrix representation
 create.pf.df = function(M, occupancyM, min.occupancy.sec=1, frame.rate=20, sigma=1.4, smooth=FALSE) {
   if (smooth) {
@@ -19,7 +12,7 @@ create.pf.df = function(M, occupancyM, min.occupancy.sec=1, frame.rate=20, sigma
   min.occupancy = min.occupancy.sec * frame.rate
   
   smoothedOccupancy = occupancyM
-  min.smoothed.occupancy = min.occupancy
+  min.smoothed.occupancy = 0
   if (smooth) {
     min.smoothed.occupancy = min.occupancy * 1/(2*pi*sigma^2)
     smoothedOccupancy = gauss2dsmooth(occupancyM, lambda=sigma, nx=11, ny=11)
@@ -38,7 +31,9 @@ create.pf.df = function(M, occupancyM, min.occupancy.sec=1, frame.rate=20, sigma
 plot.pf = function(df, max.x, max.y) {
   jet.colours = colorRampPalette(c("#00007F", "blue", "#007FFF", "cyan", "#7FFF7F", "yellow", "#FF7F00", "red", "#7F0000"))
   
-  ggplot(df, aes(x=Var1, y=max.y-Var2)) +
+  df %>%
+    filter(!is.na(value.field)) %>%
+    ggplot(aes(x=Var1, y=max.y-Var2)) +
     geom_raster(aes(fill=value.field), interpolate=FALSE) +
     scale_fill_gradientn(colours=jet.colours(7)) +
     xlim(c(0, max.x)) + ylim(c(0, max.y)) +
@@ -76,6 +71,7 @@ plot.event.vectors = function(df, event.var=nevents, event.thr=0.5) {
 field.cor = function(field1, field2, max.xy, make.cor.plot=FALSE) {
   result = list()
   joined.fields = inner_join(field1, field2, by=c('Var1', 'Var2')) %>%
+    filter(!is.na(value.field.x), !is.na(value.field.y)) %>%
     # Avoid calculating correlation on the edges: the blue highly correlated and increases the overall correlation
     filter(Var1 < max.xy - 1, Var2 < max.xy - 1, Var1 > 2, Var2 > 2)  
   result$cor = cor(joined.fields$value.field.x, joined.fields$value.field.y)
@@ -114,7 +110,7 @@ cell.spatial.info = function(cell.df,
                              binned.trace.var='response_bin',
                              min.occupancy.sec=1,
                              kernel.size=5,
-                             gaussian.var=2) {
+                             gaussian.var=1) {
   cell.df = data.table(cell.df)
   
   cell.nevents = nrow(cell.df[nevents > 0,])
@@ -150,7 +146,9 @@ cell.spatial.info = function(cell.df,
                                           trialEnds=as.integer(trial_ends), 
                                           nshuffles=nshuffles,
                                           minShift=shuffle.shift.sec * bin.hz,
-                                          minOccupancy=min.occupancy.sec * bin.hz) # min occupancy
+                                          minOccupancy=min.occupancy.sec * bin.hz, # min occupancy
+                                          kernelSize=kernel.size,
+                                          gaussianVar=gaussian.var)
   si.signif.thresh = quantile(shuffle.pf$shuffle.si, 0.95, na.rm=TRUE)[[1]]
   si.signif = pf$spatial.information >= si.signif.thresh
   mi.signif.thresh = quantile(shuffle.pf$shuffle.mi, 0.95, na.rm=TRUE)[[1]]
@@ -179,14 +177,14 @@ cell.spatial.info = function(cell.df,
                        pf$occupancy, 
                        min.occupancy.sec=min.occupancy.sec, 
                        frame.rate=bin.hz, 
-                       smooth = FALSE)
+                       smooth=FALSE)
   if (nrow(pf.df) > 0) {
     max.row = pf.df[which.max(pf.df$value.field),]
   } else { # no bin with high enough occupancy
     max.row=list(value.field=0, Var1=-1, Var2=-1)
   }
   cell_info$field.max = max.row$value.field
-  cell_info$field.mean = mean(pf.df$value.field)
+  cell_info$field.mean = mean(pf.df$value.field, na.rm = TRUE)
   cell_info$field.max.x = max.row$Var1 / nstim.x * 100
   cell_info$field.max.y = max.row$Var2/ nstim.y * 100
   

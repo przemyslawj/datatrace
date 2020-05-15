@@ -1,7 +1,8 @@
-#include <Rcpp.h>
+#include "debug_utils.h"
+#include "trace_utils.h"
+
 using namespace Rcpp;
 
-#include "trace_utils.h"
 
 NumericVector chunkShuffle(NumericVector& trace,
                            IntegerVector& trialEnds, 
@@ -50,8 +51,8 @@ NumericVector randomShift(NumericVector& trace,
     int ntrial = trialEnds[trial_i] - trialStart;
     if (ntrial > 0) {
       if (ntrial < 2 * minShift) {
-        Rcout << "[warning] randomShift: trial shorter than minShift=" << minShift << " using half value" << std::endl;
-        minShift = std::max(0, ntrial / 2 - 1);
+        Debug("[warning] randomShift: trial shorter than 2*minShift");
+        minShift = std::max(1, ntrial / 4);
       }
       int shift = std::rand() % (ntrial - 2 * minShift + 1) + minShift;
       for (int i = 0; i < ntrial; ++i) {
@@ -110,6 +111,7 @@ LogicalVector isRunning(DataFrame& df,
   
   return result;
 }
+
 
 /*** R
 trace = c(0, 1, 1, 1, 1, 1, 1, 0)

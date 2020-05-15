@@ -5,6 +5,7 @@
 // This bias is calculated using method from Panzeri and Treves, 1996.
 //
 #include <RcppArmadillo.h>
+#include "debug_utils.h"
 #include "mutual_info.h"
 #include "trace_utils.h"
 #include "smoothing.h"
@@ -51,7 +52,7 @@ arma::mat calcFrMap(arma::mat& occupancyMap, arma::mat& totalActivityMap, int mi
       if (occupancyMap(x,y) >= minOccupancy) {
         fr(x,y) = totalActivityMap(x,y) / occupancyMap(x,y);
       } else {
-        fr(x,y) = NAN;
+        fr(x,y) = NA_REAL;
       }
     }
   }
@@ -171,16 +172,6 @@ double getSpaceSamplingFactor(MfrModel& mfrModel, int minOccupancy) {
   return ((double) occupiedBins) / (mfrModel.occupancyMap.n_rows * mfrModel.occupancyMap.n_cols);
 }
 
-void printMat(arma::mat& fr) {
-  Debug("Values:" << std::endl);
-  for (int x = 0; x < fr.n_rows; ++x) {
-    for (int y = 0; y < fr.n_cols; ++y) {
-      Debug(fr(x,y) << " ");  
-    }
-    Debug(std::endl);
-  }
-}
-
 // Smooths the fr map and totalActivity map convolving the kernel.
 MfrModel smoothMfr(MfrModel& mfrModel, arma::mat& kernel) {
   arma::mat smoothOccupancy = conv2(mfrModel.occupancyMap, kernel, "same");
@@ -193,7 +184,7 @@ MfrModel smoothMfr(MfrModel& mfrModel, arma::mat& kernel) {
       if (!std::isnan(mfrModel.fr(x,y))) {
         smoothFr(x,y) = smoothTotalActivity(x,y) / smoothOccupancy(x,y);
       } else {
-        smoothFr(x,y) = NAN;
+        smoothFr(x,y) = NA_REAL;
       }
     }
   }
@@ -237,8 +228,8 @@ SEXP calcPlaceField(IntegerVector& bin_x,
   MfrModel mfrModel = createMfrModel(bin_x, bin_y, nbins_x, nbins_y, trace, minOccupancy);
   Debug("Model before smoothing");
   printMat(mfrModel.fr);
+  arma::mat kernel = createGaussianKernel(kernelSize, gaussianVar);
   if (kernelSize > 0) {
-    arma::mat kernel = createGaussianKernel(kernelSize, gaussianVar);
     mfrModel = smoothMfr(mfrModel, kernel);
   }
   Debug("Model after smoothing");
@@ -273,7 +264,10 @@ SEXP calcPlaceField(IntegerVector& bin_x,
     }
   }
 
-  BinnedResponseModel2D m = create2DResponseModel(binnedTrace, nresponse, bin_x, bin_y, nbins_x, nbins_y);
+  BinnedResponseModel2D m = create2DResponseModel(binnedTrace, nresponse, bin_x, bin_y, nbins_x, nbins_y, minOccupancy);
+  if (kernelSize > 0) {
+    m = smooth2DResponseModel(m, kernel);
+  }
   MI_Data miData = modelMutualInfo(m);
   Debug(", MI_bias=" << miData.MI_bias <<std::endl);
   result["mutual.info"] = miData.MI;
@@ -327,7 +321,10 @@ SEXP placeFieldStatsForShuffled(IntegerVector& bin_x,
     shuffleSI[i] = calculateSI(mfrModel, shuffledTrace.size());
 
     NumericVector shuffledBinnedTrace = randomShift(binnedTrace, trialEnds, minShift);
-    BinnedResponseModel2D m = create2DResponseModel(shuffledBinnedTrace, nresponse, bin_x, bin_y, nbins_x, nbins_y);
+    BinnedResponseModel2D m = create2DResponseModel(shuffledBinnedTrace, nresponse, bin_x, bin_y, nbins_x, nbins_y, minOccupancy);
+    if (kernelSize > 0) {
+      m = smooth2DResponseModel(m, kernel);
+    }
     MI_Data miData = modelMutualInfo(m);
     shuffleMI[i] = miData.MI;
   }
@@ -353,13 +350,14 @@ pf$spatial.information
 pf$mutual.info
 pf$mfr
 
-pf.smooth = calcPlaceField(x, y, 2, 7, trace, binnedTrace + 1, 1, 3, 1)
+pf.smooth = calcPlaceField(x, y, 2, 7, trace, binnedTrace + 1, 1, 3, 0.5)
 pf.smooth$field
 
 shuffle.pf = placeFieldStatsForShuffled(bin_x=x, bin_y=y, nbins_x=2, nbins_y=5, 
                                         trace=trace, binnedTrace=binnedTrace + 1, 
                                         trialEnds=c(4, length(trace)), 
-                                        nshuffles=3, minShift=1, minOccupancy=1, kernelSize=3, gaussianVar=1)
+                                        nshuffles=5, minShift=1, minOccupancy=1, 
+                                        kernelSize=3, gaussianVar=0.5)
 shuffle.pf
 */
 

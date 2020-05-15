@@ -23,7 +23,6 @@ public:
   arma::mat prob_r_given_s;
   NumericVector prob_response;
   NumericVector prob_stim;
-  int nstim;
   int nresponse;
   int N;
 };
@@ -32,7 +31,8 @@ class BinnedResponseModel2D : public BinnedResponseModel {
 public:
   // Cube  (response x stim_x x stim_y) of probabilities
   arma::cube prob_r_given_xy;
-  arma::mat prob_stim_xy;
+  arma::cube total_r_given_xy;
+  arma::mat count_stim_xy;
 };
 
 BinnedResponseModel2D create2DResponseModel(NumericVector& response, 
@@ -40,7 +40,12 @@ BinnedResponseModel2D create2DResponseModel(NumericVector& response,
                                             IntegerVector& stimulus_x, 
                                             IntegerVector& stimulus_y, 
                                             int nstim_x,
-                                            int nstim_y);
+                                            int nstim_y,
+                                            int minOccurrence);
+
 MI_Data modelMutualInfo(BinnedResponseModel2D& m);
+
+BinnedResponseModel2D smooth2DResponseModel(BinnedResponseModel2D& m,
+                                            arma::mat& kernel);
 
 #endif
