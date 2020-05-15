@@ -7,6 +7,7 @@
 #include <RcppArmadillo.h>
 #include "mutual_info.h"
 #include "trace_utils.h"
+#include "smoothing.h"
 // [[Rcpp::depends(RcppArmadillo)]]
 #include <Rcpp.h>
 #include <cmath>
@@ -22,23 +23,40 @@ using namespace Rcpp;
 class MfrModel {
 public:
   arma::mat occupancyMap;
+  arma::mat totalActivityMap;
   arma::mat fr;
   double mfr;
   double min_trace;
   double sparsity;
   
   MfrModel(arma::mat& occupancyMap,
+           arma::mat& totalActivityMap,
            arma::mat& fr,
            double mfr,
            double min_trace,
            double sparsity) {
     this->occupancyMap = occupancyMap;
+    this->totalActivityMap = totalActivityMap;
     this->fr = fr;
     this->mfr = mfr;
     this->min_trace = min_trace;
     this->sparsity = sparsity;
   }
 };
+
+arma::mat calcFrMap(arma::mat& occupancyMap, arma::mat& totalActivityMap, int minOccupancy) {
+  arma::mat fr(occupancyMap.n_rows, occupancyMap.n_cols, arma::fill::zeros);
+  for (int x = 0; x < occupancyMap.n_rows; ++x) {
+    for (int y = 0; y < occupancyMap.n_cols; ++y) {
+      if (occupancyMap(x,y) >= minOccupancy) {
+        fr(x,y) = totalActivityMap(x,y) / occupancyMap(x,y);
+      } else {
+        fr(x,y) = NAN;
+      }
+    }
+  }
+  return fr;
+}
 
 /**
  * Calculates MfrModel for the stimulus values and the corresponding firing signal.
@@ -58,7 +76,6 @@ MfrModel createMfrModel(IntegerVector& bin_x,
                         int minOccupancy) {
   arma::mat totalActivityMap(nbins_x, nbins_y, arma::fill::zeros);
   arma::mat occupancyMap(nbins_x, nbins_y, arma::fill::zeros);
-  arma::mat fr(nbins_x, nbins_y, arma::fill::zeros);
   
   // Calculate occupancy and total activity maps
   double mfr = 0;
@@ -74,21 +91,19 @@ MfrModel createMfrModel(IntegerVector& bin_x,
     mfr += trace_val / trace.size();
   }  
   
+  arma::mat fr = calcFrMap(occupancyMap, totalActivityMap, minOccupancy);
   double sparsity = 0.0;
-  for (int x = 0; x < nbins_x; ++x) {
-    for (int y = 0; y < nbins_y; ++y) {
+  for (int x = 0; x < occupancyMap.n_rows; ++x) {
+    for (int y = 0; y < occupancyMap.n_cols; ++y) {
       if (occupancyMap(x,y) >= minOccupancy) {
-        fr(x,y) = totalActivityMap(x,y) / occupancyMap(x,y);
         double p_s = (double) occupancyMap(x,y) / trace.size();
         sparsity += p_s * std::pow(fr(x,y), 2) / std::pow(mfr, 2);
-      } else {
-        fr(x,y) = NAN;
       }
     }
   }
 
   double min_trace = (double) *(std::min_element(trace.cbegin(), trace.cend()));
-  return MfrModel(occupancyMap, fr, mfr, min_trace, sparsity);
+  return MfrModel(occupancyMap, totalActivityMap, fr, mfr, min_trace, sparsity);
 }
 
 // [[Rcpp::export]]
@@ -116,7 +131,7 @@ SEXP create_mfr_model(IntegerVector& bin_x,
  * - fr_xy - firing rate or mean trace value in that bin
  * - mfr - mean firing rate or mean trace value
  */
-double calculateSI(MfrModel mfrModel, int minOccupancy, int N) {
+double calculateSI(MfrModel mfrModel, int N) {
   double SI = 0.0;
   
   // normalize the firing rates to be positive and higher than 0.01
@@ -129,8 +144,8 @@ double calculateSI(MfrModel mfrModel, int minOccupancy, int N) {
   double mfr = mfrModel.mfr - trace_offset;
   for (int x = 0; x < mfrModel.occupancyMap.n_rows; ++x) {
     for (int y = 0; y < mfrModel.occupancyMap.n_cols; ++y) {
-      if (mfrModel.occupancyMap(x,y) >= minOccupancy) {
-        Debug(" xy=" << xy << std::endl);
+      if (!std::isnan(mfrModel.fr(x,y))) {
+        Debug(" x=" << x << ", y=" << y << std::endl);
         double p_occupancy = (double) mfrModel.occupancyMap(x,y) / N;
         double fr_xy = mfrModel.fr(x,y) - trace_offset;
         double r_SI = p_occupancy * fr_xy / mfr * log2(fr_xy / mfr);
@@ -142,7 +157,6 @@ double calculateSI(MfrModel mfrModel, int minOccupancy, int N) {
   
   return SI;
 }
-
 
 double getSpaceSamplingFactor(MfrModel& mfrModel, int minOccupancy) {
   int occupiedBins = 0;
@@ -157,7 +171,43 @@ double getSpaceSamplingFactor(MfrModel& mfrModel, int minOccupancy) {
   return ((double) occupiedBins) / (mfrModel.occupancyMap.n_rows * mfrModel.occupancyMap.n_cols);
 }
 
+void printMat(arma::mat& fr) {
+  Debug("Values:" << std::endl);
+  for (int x = 0; x < fr.n_rows; ++x) {
+    for (int y = 0; y < fr.n_cols; ++y) {
+      Debug(fr(x,y) << " ");  
+    }
+    Debug(std::endl);
+  }
+}
 
+// Smooths the fr map and totalActivity map convolving the kernel.
+MfrModel smoothMfr(MfrModel& mfrModel, arma::mat& kernel) {
+  arma::mat smoothOccupancy = conv2(mfrModel.occupancyMap, kernel, "same");
+  arma::mat smoothTotalActivity = conv2(mfrModel.totalActivityMap, kernel, "samke");
+
+  // Calculate smooth FR map but using original occupancy values for thresholdin min occupancy
+  arma::mat smoothFr(smoothOccupancy.n_rows, smoothOccupancy.n_cols, arma::fill::zeros);
+  for (int x = 0; x < smoothOccupancy.n_rows; ++x) {
+    for (int y = 0; y < smoothOccupancy.n_cols; ++y) {
+      if (!std::isnan(mfrModel.fr(x,y))) {
+        smoothFr(x,y) = smoothTotalActivity(x,y) / smoothOccupancy(x,y);
+      } else {
+        smoothFr(x,y) = NAN;
+      }
+    }
+  }
+  
+  MfrModel smoothedModel = MfrModel(smoothOccupancy,
+                                    smoothTotalActivity,
+                                    smoothFr,
+                                    mfrModel.mfr,
+                                    mfrModel.min_trace,
+                                    mfrModel.sparsity);
+  return smoothedModel;
+}
+
+// Set kernel size to 0 not to apply gaussian smoothing.
 // [[Rcpp::export]]
 SEXP calcPlaceField(IntegerVector& bin_x,
                     IntegerVector& bin_y,
@@ -165,7 +215,9 @@ SEXP calcPlaceField(IntegerVector& bin_x,
                     int nbins_y,
                     NumericVector& trace,
                     NumericVector& binnedTrace,
-                    int minOccupancy) {
+                    int minOccupancy,
+                    int kernelSize,
+                    double gaussianVar) {
 
   List result;
   result["field"] = arma::mat(nbins_x, nbins_y, arma::fill::zeros);
@@ -183,14 +235,22 @@ SEXP calcPlaceField(IntegerVector& bin_x,
   int nresponse = (int) *(std::max_element(binnedTrace.cbegin(), binnedTrace.cend()));
 
   MfrModel mfrModel = createMfrModel(bin_x, bin_y, nbins_x, nbins_y, trace, minOccupancy);
-  double SI = calculateSI(mfrModel, minOccupancy, trace.size());
+  Debug("Model before smoothing");
+  printMat(mfrModel.fr);
+  if (kernelSize > 0) {
+    arma::mat kernel = createGaussianKernel(kernelSize, gaussianVar);
+    mfrModel = smoothMfr(mfrModel, kernel);
+  }
+  Debug("Model after smoothing");
+  printMat(mfrModel.fr);
+  double SI = calculateSI(mfrModel, trace.size());
   double space_sampling_factor = getSpaceSamplingFactor(mfrModel, minOccupancy);
   Debug("MFR=" << mfrModel.mfr);
 
   double maxField = 0.0;
   for (int x = 0; x < nbins_x; ++x) {
     for (int y = 0; y < nbins_y; ++y) {
-      if (mfrModel.occupancyMap(x,y) >= minOccupancy && mfrModel.fr(x,y) >= maxField) {
+      if (!std::isnan(mfrModel.fr(x,y)) && mfrModel.fr(x,y) >= maxField) {
         maxField = mfrModel.fr(x,y);
       }
     }
@@ -232,7 +292,6 @@ SEXP calcPlaceField(IntegerVector& bin_x,
   return(result);
 }
 
-
 // [[Rcpp::export]]
 SEXP placeFieldStatsForShuffled(IntegerVector& bin_x,
                                 IntegerVector& bin_y,
@@ -243,9 +302,12 @@ SEXP placeFieldStatsForShuffled(IntegerVector& bin_x,
                                 IntegerVector& trialEnds,
                                 int nshuffles,
                                 int minShift,
-                                int minOccupancy) {
+                                int minOccupancy,
+                                int kernelSize,
+                                double gaussianVar) {
   NumericVector shuffleSI = NumericVector(nshuffles, 0.0);
   NumericVector shuffleMI = NumericVector(nshuffles, 0.0);
+  arma::mat kernel = createGaussianKernel(kernelSize, gaussianVar);
   
   List result;
   result["shuffle.si"] = shuffleSI;
@@ -255,7 +317,14 @@ SEXP placeFieldStatsForShuffled(IntegerVector& bin_x,
     //NumericVector shuffledTrace = chunkShuffle(trace, trialEnds, shuffleChunkLength);
     NumericVector shuffledTrace = randomShift(trace, trialEnds, minShift);
     MfrModel mfrModel = createMfrModel(bin_x, bin_y, nbins_x, nbins_y, shuffledTrace, minOccupancy);
-    shuffleSI[i] = calculateSI(mfrModel, minOccupancy, shuffledTrace.size());
+    if (kernelSize > 0) {
+      Debug("FR before smoothing");
+      printMat(mfrModel.fr);
+      mfrModel = smoothMfr(mfrModel, kernel);
+      Debug("FR after smoothing");
+      printMat(mfrModel.fr);
+    }
+    shuffleSI[i] = calculateSI(mfrModel, shuffledTrace.size());
 
     NumericVector shuffledBinnedTrace = randomShift(binnedTrace, trialEnds, minShift);
     BinnedResponseModel2D m = create2DResponseModel(shuffledBinnedTrace, nresponse, bin_x, bin_y, nbins_x, nbins_y);
@@ -278,13 +347,19 @@ y =          c(1, 2, 3, 4, 5, 5, 4, 3)
 binnedTrace=c(0, 0, 0, 1, 0, 0, 1, 0)
 trace = binnedTrace / 2
 
-pf = calcPlaceField(x, y, 2, 5, trace, binnedTrace + 1, 1)
+pf = calcPlaceField(x, y, 2, 5, trace, binnedTrace + 1, 1, 0, 0)
 #pf=with(cell.df, getCppPlaceField(smooth_trans_x, smooth_trans_y, deconv_trace, traceQuantiles, 10,2), 4)
 pf$spatial.information
 pf$mutual.info
 pf$mfr
 
-shuffle.pf = placeFieldStatsForShuffled(x, y, 2, 5, trace, binnedTrace + 1, c(4, length(trace)), 3, 1, 1)
+pf.smooth = calcPlaceField(x, y, 2, 7, trace, binnedTrace + 1, 1, 3, 1)
+pf.smooth$field
+
+shuffle.pf = placeFieldStatsForShuffled(bin_x=x, bin_y=y, nbins_x=2, nbins_y=5, 
+                                        trace=trace, binnedTrace=binnedTrace + 1, 
+                                        trialEnds=c(4, length(trace)), 
+                                        nshuffles=3, minShift=1, minOccupancy=1, kernelSize=3, gaussianVar=1)
 shuffle.pf
 */
 

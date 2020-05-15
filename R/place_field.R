@@ -10,13 +10,21 @@
 }
 
 # Create df with smoothed values from matrix representation
-create.pf.df = function(M, occupancyM, min.occupancy.sec=1, frame.rate=20, sigma = 1.4) {
-  M1 = gauss2dsmooth(M, lambda=sigma, nx=11, ny=11)
-  df1 = reshape2::melt(M1) 
+create.pf.df = function(M, occupancyM, min.occupancy.sec=1, frame.rate=20, sigma=1.4, smooth=FALSE) {
+  if (smooth) {
+    M = gauss2dsmooth(M, lambda=sigma, nx=11, ny=11)
+  }
+  df1 = reshape2::melt(M) 
   
   min.occupancy = min.occupancy.sec * frame.rate
-  min.smoothed.occupancy = min.occupancy * 1/(2*pi*sigma^2)
-  smoothedOccupancy = gauss2dsmooth(occupancyM, lambda=sigma, nx=11, ny=11)
+  
+  smoothedOccupancy = occupancyM
+  min.smoothed.occupancy = min.occupancy
+  if (smooth) {
+    min.smoothed.occupancy = min.occupancy * 1/(2*pi*sigma^2)
+    smoothedOccupancy = gauss2dsmooth(occupancyM, lambda=sigma, nx=11, ny=11)
+  }
+  
   #TODO: filtering below assumes a circular maze
   mid.pt = mean(1:dim(M)[1])
   df_org = reshape2::melt(smoothedOccupancy) %>%
@@ -104,7 +112,9 @@ cell.spatial.info = function(cell.df,
                              shuffle.shift.sec=20,
                              trace.var='trace',
                              binned.trace.var='response_bin',
-                             min.occupancy.sec=1) {
+                             min.occupancy.sec=1,
+                             kernel.size=5,
+                             gaussian.var=2) {
   cell.df = data.table(cell.df)
   
   cell.nevents = nrow(cell.df[nevents > 0,])
@@ -121,18 +131,26 @@ cell.spatial.info = function(cell.df,
   trace.quantiles = quantile(trace.vals, c(0.2, 0.99, 1.0), na.rm=TRUE)
 
   nstim = nstim.x * nstim.y
-  pf = calcPlaceField(cell.df$bin.x, cell.df$bin.y, nstim.x, nstim.y, 
-                      trace.vals,
-                      cell.df[[binned.trace.var]],
-                      min.occupancy.sec * bin.hz)
+  pf = calcPlaceField(bin_x=cell.df$bin.x, 
+                      bin_y=cell.df$bin.y, 
+                      nbins_x=nstim.x, 
+                      nbins_y=nstim.y, 
+                      trace=trace.vals,
+                      binnedTrace=cell.df[[binned.trace.var]],
+                      minOccupancy=min.occupancy.sec * bin.hz,
+                      kernelSize=kernel.size,
+                      gaussianVar=gaussian.var)
   
-  shuffle.pf = placeFieldStatsForShuffled(cell.df$bin.x, cell.df$bin.y, nstim.x, nstim.y, 
-                                          trace.vals,
-                                          cell.df[[binned.trace.var]],
-                                          as.integer(trial_ends), 
-                                          nshuffles,
-                                          shuffle.shift.sec * bin.hz,
-                                          min.occupancy.sec * bin.hz) # min occupancy
+  shuffle.pf = placeFieldStatsForShuffled(bin_x=cell.df$bin.x, 
+                                          bin_y=cell.df$bin.y, 
+                                          nbins_x=nstim.x, 
+                                          nbins_y=nstim.y, 
+                                          trace=trace.vals,
+                                          binnedTrace=cell.df[[binned.trace.var]],
+                                          trialEnds=as.integer(trial_ends), 
+                                          nshuffles=nshuffles,
+                                          minShift=shuffle.shift.sec * bin.hz,
+                                          minOccupancy=min.occupancy.sec * bin.hz) # min occupancy
   si.signif.thresh = quantile(shuffle.pf$shuffle.si, 0.95, na.rm=TRUE)[[1]]
   si.signif = pf$spatial.information >= si.signif.thresh
   mi.signif.thresh = quantile(shuffle.pf$shuffle.mi, 0.95, na.rm=TRUE)[[1]]
@@ -147,7 +165,7 @@ cell.spatial.info = function(cell.df,
                    field.size.50=pf$field.size.50,
                    field.size.25=pf$field.size.25,
                    spatial.information.perspike=pf$spatial.information.perspike,
-                   mfr=pf$mfr,
+                   trace.mean=pf$mfr,
                    mutual.info=pf$mutual.info,
                    mutual.info.bias=pf$mutual.info.bias,
                    space.sampling.factor = pf$space.sampling.factor,
@@ -157,7 +175,11 @@ cell.spatial.info = function(cell.df,
                    nevents=cell.nevents)
 
   # find field max value and pos in the smoothed values
-  pf.df = create.pf.df(pf$field, pf$occupancy, frame.rate=bin.hz)
+  pf.df = create.pf.df(pf$field, 
+                       pf$occupancy, 
+                       min.occupancy.sec=min.occupancy.sec, 
+                       frame.rate=bin.hz, 
+                       smooth = FALSE)
   if (nrow(pf.df) > 0) {
     max.row = pf.df[which.max(pf.df$value.field),]
   } else { # no bin with high enough occupancy
