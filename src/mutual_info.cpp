@@ -1,5 +1,6 @@
 #include "debug_utils.h"
 #include "mutual_info.h"
+#include "smoothing.h"
 #include "trace_utils.h"
 
 /** 
@@ -16,18 +17,17 @@ MI_Data stimulus_mutual_info(double p_stim,
   int totalResponseBins = 0;
   double MI = 0.0;
   for (int r = 0; r < p_response.size(); ++r) {
-    
-    Debug("response=" << r);
-    Debug(", p_stim=" << p_stim);
-    Debug(", p_r_given_s=" << p_r_given_s(r));
-    Debug(", p_response=" << p_response[r]);
     if (!std::isnan(p_r_given_s[r]) && p_r_given_s[r] > 0) {
+      Debug("response=" << r);
+      Debug(", p_stim=" << p_stim);
+      Debug(", p_r_given_s=" << p_r_given_s(r));
+      Debug(", p_response=" << p_response[r]);
       ++totalResponseBins;
       double r_MI = p_stim * p_r_given_s(r) * std::log2(p_r_given_s(r) / p_response[r]);
       Debug(", MI=" << r_MI);
       MI += r_MI;
+      Debug(std::endl);
     }
-    Debug(std::endl);
   }
   MI_Data result;
   result.MI = MI;
@@ -119,7 +119,6 @@ BinnedResponseModel2D create2DResponseModel(NumericVector& response,
         }
       }
     }
-    Debug("Prob r=" << r << " before smoothing ");
   }
   
   m.count_stim_xy = s_counts;
@@ -132,7 +131,9 @@ BinnedResponseModel2D create2DResponseModel(NumericVector& response,
 }
 
 MI_Data modelMutualInfo(BinnedResponseModel2D& m) {
-  int totalResponseBins = 0;
+  // Mutual information bias estimate from: Analytical estimates of limited sampling biases in different
+  // information measures, Panzeri & Treves, 1996.
+  int totalResponseBinsDiff = 0;
   int totalStimuliBins = 0;
   double MI = 0.0;
   for (int y = 0; y < m.count_stim_xy.n_cols; ++y) {
@@ -142,20 +143,20 @@ MI_Data modelMutualInfo(BinnedResponseModel2D& m) {
       if (p_stim > 0) {
         if (!std::isnan(prob_r_given_x(0,x))) { // false when stim x,y was visited
           ++totalStimuliBins;
+          MI_Data mi_Data = stimulus_mutual_info(p_stim, 
+                                                 m.prob_response, 
+                                                 prob_r_given_x.col(x));
+          MI += mi_Data.MI;
+          totalResponseBinsDiff += mi_Data.totalResponseBins - m.nresponse;
+          
         }
-        MI_Data mi_Data = stimulus_mutual_info(p_stim, 
-                                               m.prob_response, 
-                                               prob_r_given_x.col(x));
-        MI += mi_Data.MI;
-        totalResponseBins += mi_Data.totalResponseBins;
       }
     }
   }
   
-  // Mutual information bias estimate from: Analytical estimates of limited sampling biases in different
-  // information measures, Panzeri & Treves, 1996.
-  Debug("totalresponseBins=" << totalResponseBins << ", nresponseBins=" << m.nresponse << ", totalStimuliBins=" << totalStimuliBins << std::endl);
-  double MI_bias = (totalResponseBins - m.nresponse - totalStimuliBins + 1 )  / (2 * m.N * std::log(2));
+  Debug("totalresponseBinsDiff=" << totalResponseBinsDiff << ", nresponseBins=" << m.nresponse << ", totalStimuliBins=" << totalStimuliBins << std::endl);
+  double MI_bias = (totalResponseBinsDiff - totalStimuliBins * (totalStimuliBins - 1) )  / (2 * m.N * std::log(2));
+  
   
   MI_Data result;
   result.MI = MI;
@@ -177,16 +178,20 @@ BinnedResponseModel2D smooth2DResponseModel(BinnedResponseModel2D& m,
   for (int r = 0; r < m.nresponse; ++r) {
     // Get matrix x by y matrix to be convolved
     arma::mat total_xy(nrows, ncols);
+    int countStim = 0;
     for (int x = 0; x < nrows; ++x) {
       for (int y = 0; y < ncols; ++y) {  
         total_xy(x,y) = m.total_r_given_xy(r,x,y);
+        ++countStim;
       }
     }
     
     arma::mat smooth_total_xy = conv2(total_xy, kernel, "same");
     
-    Debug("Prob r=" << r << " before smoothing ");
+    Debug("[smooth2DResponseModel] r=" << r << " Total actvitiy before smoothing ");
+    #ifdef USEDEBUG
     printMat(total_xy);
+    #endif
     
     // Set convolved probabilities in the cube
     for (int x = 0; x < nrows; ++x) {
@@ -200,11 +205,15 @@ BinnedResponseModel2D smooth2DResponseModel(BinnedResponseModel2D& m,
         }
       }
     }
-    Debug("Prob r=" << r << " after smoothing ");
+    Debug("[smooth2DResponseModel] " << r << " Total activity after smoothing ");
+    #ifdef USEDEBUG
     printMat(smooth_total_xy);
+    #endif
   }
   
-  result.count_stim_xy = smooth_count_stim_xy;
+  double stimCountMultiplier = m.N / arma::accu(smooth_count_stim_xy);
+  // linearly scale stim occupancies (might not be best choice, non-linear scaling could be better..)
+  result.count_stim_xy = smooth_count_stim_xy * stimCountMultiplier;
   result.prob_r_given_xy = smooth_prob_r_given_xy;
   result.prob_response = m.prob_response;
   result.nresponse = m.nresponse;
@@ -212,7 +221,7 @@ BinnedResponseModel2D smooth2DResponseModel(BinnedResponseModel2D& m,
   return result;
 }
 
-// [[Rcpp::export]]
+  // [[Rcpp::export]]
 SEXP mutual_info(NumericVector& response,
                  int nresponseBins,
                  IntegerVector& stimulus,
@@ -230,6 +239,41 @@ SEXP mutual_info(NumericVector& response,
   IntegerVector stimulus_y(stimulus.size(), 1);
   Debug("Creating model" << std::endl);
   BinnedResponseModel2D m = create2DResponseModel(response, nresponseBins, stimulus, stimulus_y, nstim, 1, minStimOccurrence);
+  Debug("Calculating mutual info" << std::endl);
+  MI_Data miData = modelMutualInfo(m);
+  
+  
+  result["mutual.info"] = miData.MI;
+  result["mutual.info.bias"] = miData.MI_bias;
+  return result;
+}
+
+
+// [[Rcpp::export]]
+SEXP mutual_info2D(NumericVector& response,
+                   int nresponseBins,
+                   IntegerVector& stimulus_x,
+                   IntegerVector& stimulus_y,
+                   int nstim_x,
+                   int nstim_y,
+                   int minStimOccurrence,
+                   int kernelSize,
+                   double gaussianVar) {
+  List result;
+  result["mutual.info"] = 0.0;
+  result["mutual.info.bias"] = 0.0;
+  
+  if (response.size() != stimulus_x.size() || response.size() != stimulus_y.size()) {
+    Rcout << "Error: response size need to equal stimulus size vector"  << std::endl;
+    return result;
+  }
+  
+  Debug("Creating model" << std::endl);
+  BinnedResponseModel2D m = create2DResponseModel(response, nresponseBins, stimulus_x, stimulus_y, nstim_x, nstim_y, minStimOccurrence);
+  if (kernelSize > 0) {
+    arma::mat kernel = createGaussianKernel(kernelSize, gaussianVar);
+    m = smooth2DResponseModel(m, kernel);
+  }
   Debug("Calculating mutual info" << std::endl);
   MI_Data miData = modelMutualInfo(m);
   
@@ -271,11 +315,14 @@ SEXP mutual_info_with_shuffles(NumericVector& response,
 
 /*** R
 # Perfect mutual info
-response = c(c(1, 2, 1, 2, 2), rep(1, 10))
-stimulus = c(c(1, 2, 1, 2, 2), rep(1, 10))
-res = mutual_info(response, 2, stimulus, 2, 1)
-res = mutual_info_with_shuffles(response, 2, stimulus, 2, c(1, 10), 3, 2, 1)
-res$mutual.info
-res$mutual.info.bias
+# response = c(c(1, 2, 1, 2, 2), rep(1, 10))
+# stimulus = c(c(1, 2, 1, 2, 2), rep(1, 10))
+# res = mutual_info(response, 2, stimulus, 2, 1)
+# res = mutual_info_with_shuffles(response, 2, stimulus, 2, c(1, 10), 3, 2, 1)
+# res$mutual.info
+# res$mutual.info.bias
+
+mutual_info2D(cell.df$response_bin, 2, cell.df$bin.x, cell.df$bin.y, 20,20, 1, 3, 0.5)
+
 */
 

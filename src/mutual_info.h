@@ -24,7 +24,7 @@ public:
   NumericVector prob_response;
   NumericVector prob_stim;
   int nresponse;
-  int N;
+  double N;
 };
 
 class BinnedResponseModel2D : public BinnedResponseModel {

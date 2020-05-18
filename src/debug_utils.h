@@ -5,9 +5,9 @@
 // [[Rcpp::depends(RcppArmadillo)]]
 #include <Rcpp.h>
 
-//#define USEDEBUG
+#define USEDEBUG
 
-#ifdef USEDEBUG
+//#ifdef USEDEBUG
 #define Debug(x) Rcout << x
 #else
 #define Debug(x)
