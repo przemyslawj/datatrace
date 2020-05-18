@@ -27,7 +27,20 @@ create.pf.df = function(M, occupancyM, min.occupancy.sec=1, frame.rate=20, sigma
   
   return(df2)
 }
+
+geom_pf = function(df, max.x, max.y) {
+  jet.colours = colorRampPalette(c("#00007F", "blue", "#007FFF", "cyan", "#7FFF7F", "yellow", "#FF7F00", "red", "#7F0000"))
   
+  list(
+    geom_raster(data=filter(df, !is.na(value.field)),
+                mapping=aes(x=Var1, y=max.y-Var2, fill=value.field), interpolate=FALSE),
+    scale_fill_gradientn(colours=jet.colours(7)),
+    xlim(c(0, max.x)),
+    ylim(c(0, max.y)),
+    theme_void()
+  )
+}
+
 plot.pf = function(df, max.x, max.y) {
   jet.colours = colorRampPalette(c("#00007F", "blue", "#007FFF", "cyan", "#7FFF7F", "yellow", "#FF7F00", "red", "#7F0000"))
   
@@ -109,8 +122,8 @@ cell.spatial.info = function(cell.df,
                              trace.var='trace',
                              binned.trace.var='response_bin',
                              min.occupancy.sec=1,
-                             kernel.size=5,
-                             gaussian.var=1) {
+                             kernel.size=9,
+                             gaussian.var=2) {
   cell.df = data.table(cell.df)
   
   cell.nevents = nrow(cell.df[nevents > 0,])
@@ -177,7 +190,8 @@ cell.spatial.info = function(cell.df,
                        pf$occupancy, 
                        min.occupancy.sec=min.occupancy.sec, 
                        frame.rate=bin.hz, 
-                       smooth=FALSE)
+                       smooth=FALSE) %>%
+    filter(!is.na(value.field))
   if (nrow(pf.df) > 0) {
     max.row = pf.df[which.max(pf.df$value.field),]
   } else { # no bin with high enough occupancy
@@ -206,7 +220,7 @@ cell.spatial.info = function(cell.df,
   }
 
   return(list(cell_info=cell_info,
-             field=pf$field,
-             occupancy=pf$occupancy,
-             g=g.placefield))
+              field=pf$field,
+              occupancy=pf$occupancy,
+              g=g.placefield))
 }

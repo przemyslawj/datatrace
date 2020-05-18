@@ -41,11 +41,12 @@ BinnedResponseModel2D create2DResponseModel(NumericVector& response,
                                             IntegerVector& stimulus_y, 
                                             int nstim_x,
                                             int nstim_y,
-                                            int minOccurrence);
+                                            double minOccurrence);
 
 MI_Data modelMutualInfo(BinnedResponseModel2D& m);
 
 BinnedResponseModel2D smooth2DResponseModel(BinnedResponseModel2D& m,
-                                            arma::mat& kernel);
+                                            arma::mat& kernel,
+                                            double minOccurrence);
 
 #endif

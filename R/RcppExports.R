@@ -21,6 +21,10 @@ mutual_info <- function(response, nresponseBins, stimulus, nstim, minStimOccurre
     .Call(`_datatrace_mutual_info`, response, nresponseBins, stimulus, nstim, minStimOccurrence)
 }
 
+mutual_info2D <- function(response, nresponseBins, stimulus_x, stimulus_y, nstim_x, nstim_y, minStimOccurrence, kernelSize, gaussianVar) {
+    .Call(`_datatrace_mutual_info2D`, response, nresponseBins, stimulus_x, stimulus_y, nstim_x, nstim_y, minStimOccurrence, kernelSize, gaussianVar)
+}
+
 mutual_info_with_shuffles <- function(response, nresponseBins, stimulus, nstim, trialEnds, nshuffles, shuffleChunkLength, minStimOccurrence) {
     .Call(`_datatrace_mutual_info_with_shuffles`, response, nresponseBins, stimulus, nstim, trialEnds, nshuffles, shuffleChunkLength, minStimOccurrence)
 }
@@ -39,6 +43,10 @@ placeFieldStatsForShuffled <- function(bin_x, bin_y, nbins_x, nbins_y, trace, bi
 
 createGaussianKernel <- function(kernelSize, var) {
     .Call(`_datatrace_createGaussianKernel`, kernelSize, var)
+}
+
+convolve <- function(M, k) {
+    .Call(`_datatrace_convolve`, M, k)
 }
 
 isRunning <- function(df, min_run_velocity, mean_run_velocity, window_dur_ms) {

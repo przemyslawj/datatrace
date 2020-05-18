@@ -79,7 +79,7 @@ BinnedResponseModel2D create2DResponseModel(NumericVector& response,
                                             IntegerVector& stimulus_y, 
                                             int nstim_x,
                                             int nstim_y,
-                                            int minOccurrence) {
+                                            double minOccurrence) {
   
   arma::cube r_given_s(nresponseBins, nstim_x, nstim_y, arma::fill::zeros);
   std::vector<int> r_counts(nresponseBins, 0);
@@ -166,9 +166,13 @@ MI_Data modelMutualInfo(BinnedResponseModel2D& m) {
 }
 
 BinnedResponseModel2D smooth2DResponseModel(BinnedResponseModel2D& m,
-                                            arma::mat& kernel) {
+                                            arma::mat& kernel,
+                                            double minOccurrence) {
   BinnedResponseModel2D result;
   arma::mat smooth_count_stim_xy = conv2(m.count_stim_xy, kernel, "same");
+  // scale min occupancy proportionally to scaling of total activity
+  double smoothedMinOccurrence = findSmoothMinOccupancy(m.count_stim_xy, smooth_count_stim_xy, minOccurrence);
+
   int nrows = m.count_stim_xy.n_rows;
   int ncols = m.count_stim_xy.n_cols;
   
@@ -198,7 +202,7 @@ BinnedResponseModel2D smooth2DResponseModel(BinnedResponseModel2D& m,
       for (int y = 0; y < ncols; ++y) {  
         smooth_total_r_given_xy(r,x,y) = smooth_total_xy(x,y);
         // Set NA if was before <- stim occurrence below the minOccurrence threshold
-        if (std::isnan(m.prob_r_given_xy(r,x,y))) {
+        if (smooth_count_stim_xy(x,y) < smoothedMinOccurrence) {
           smooth_prob_r_given_xy(r,x,y) = NA_REAL;
         } else {
           smooth_prob_r_given_xy(r,x,y) = smooth_total_xy(x,y) / smooth_count_stim_xy(x,y);  
@@ -272,7 +276,7 @@ SEXP mutual_info2D(NumericVector& response,
   BinnedResponseModel2D m = create2DResponseModel(response, nresponseBins, stimulus_x, stimulus_y, nstim_x, nstim_y, minStimOccurrence);
   if (kernelSize > 0) {
     arma::mat kernel = createGaussianKernel(kernelSize, gaussianVar);
-    m = smooth2DResponseModel(m, kernel);
+    m = smooth2DResponseModel(m, kernel, minStimOccurrence);
   }
   Debug("Calculating mutual info" << std::endl);
   MI_Data miData = modelMutualInfo(m);

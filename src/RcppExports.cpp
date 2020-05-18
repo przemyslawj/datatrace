@@ -72,6 +72,25 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// mutual_info2D
+SEXP mutual_info2D(NumericVector& response, int nresponseBins, IntegerVector& stimulus_x, IntegerVector& stimulus_y, int nstim_x, int nstim_y, int minStimOccurrence, int kernelSize, double gaussianVar);
+RcppExport SEXP _datatrace_mutual_info2D(SEXP responseSEXP, SEXP nresponseBinsSEXP, SEXP stimulus_xSEXP, SEXP stimulus_ySEXP, SEXP nstim_xSEXP, SEXP nstim_ySEXP, SEXP minStimOccurrenceSEXP, SEXP kernelSizeSEXP, SEXP gaussianVarSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector& >::type response(responseSEXP);
+    Rcpp::traits::input_parameter< int >::type nresponseBins(nresponseBinsSEXP);
+    Rcpp::traits::input_parameter< IntegerVector& >::type stimulus_x(stimulus_xSEXP);
+    Rcpp::traits::input_parameter< IntegerVector& >::type stimulus_y(stimulus_ySEXP);
+    Rcpp::traits::input_parameter< int >::type nstim_x(nstim_xSEXP);
+    Rcpp::traits::input_parameter< int >::type nstim_y(nstim_ySEXP);
+    Rcpp::traits::input_parameter< int >::type minStimOccurrence(minStimOccurrenceSEXP);
+    Rcpp::traits::input_parameter< int >::type kernelSize(kernelSizeSEXP);
+    Rcpp::traits::input_parameter< double >::type gaussianVar(gaussianVarSEXP);
+    rcpp_result_gen = Rcpp::wrap(mutual_info2D(response, nresponseBins, stimulus_x, stimulus_y, nstim_x, nstim_y, minStimOccurrence, kernelSize, gaussianVar));
+    return rcpp_result_gen;
+END_RCPP
+}
 // mutual_info_with_shuffles
 SEXP mutual_info_with_shuffles(NumericVector& response, int nresponseBins, IntegerVector& stimulus, int nstim, IntegerVector& trialEnds, int nshuffles, int shuffleChunkLength, int minStimOccurrence);
 RcppExport SEXP _datatrace_mutual_info_with_shuffles(SEXP responseSEXP, SEXP nresponseBinsSEXP, SEXP stimulusSEXP, SEXP nstimSEXP, SEXP trialEndsSEXP, SEXP nshufflesSEXP, SEXP shuffleChunkLengthSEXP, SEXP minStimOccurrenceSEXP) {
@@ -91,7 +110,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // create_mfr_model
-SEXP create_mfr_model(IntegerVector& bin_x, IntegerVector& bin_y, int nbins_x, int nbins_y, NumericVector& trace, int minOccupancy);
+SEXP create_mfr_model(IntegerVector& bin_x, IntegerVector& bin_y, int nbins_x, int nbins_y, NumericVector& trace, double minOccupancy);
 RcppExport SEXP _datatrace_create_mfr_model(SEXP bin_xSEXP, SEXP bin_ySEXP, SEXP nbins_xSEXP, SEXP nbins_ySEXP, SEXP traceSEXP, SEXP minOccupancySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -101,7 +120,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type nbins_x(nbins_xSEXP);
     Rcpp::traits::input_parameter< int >::type nbins_y(nbins_ySEXP);
     Rcpp::traits::input_parameter< NumericVector& >::type trace(traceSEXP);
-    Rcpp::traits::input_parameter< int >::type minOccupancy(minOccupancySEXP);
+    Rcpp::traits::input_parameter< double >::type minOccupancy(minOccupancySEXP);
     rcpp_result_gen = Rcpp::wrap(create_mfr_model(bin_x, bin_y, nbins_x, nbins_y, trace, minOccupancy));
     return rcpp_result_gen;
 END_RCPP
@@ -126,7 +145,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // placeFieldStatsForShuffled
-SEXP placeFieldStatsForShuffled(IntegerVector& bin_x, IntegerVector& bin_y, int nbins_x, int nbins_y, NumericVector& trace, NumericVector& binnedTrace, IntegerVector& trialEnds, int nshuffles, int minShift, int minOccupancy, int kernelSize, double gaussianVar);
+SEXP placeFieldStatsForShuffled(IntegerVector& bin_x, IntegerVector& bin_y, int nbins_x, int nbins_y, NumericVector& trace, NumericVector& binnedTrace, IntegerVector& trialEnds, int nshuffles, int minShift, double minOccupancy, int kernelSize, double gaussianVar);
 RcppExport SEXP _datatrace_placeFieldStatsForShuffled(SEXP bin_xSEXP, SEXP bin_ySEXP, SEXP nbins_xSEXP, SEXP nbins_ySEXP, SEXP traceSEXP, SEXP binnedTraceSEXP, SEXP trialEndsSEXP, SEXP nshufflesSEXP, SEXP minShiftSEXP, SEXP minOccupancySEXP, SEXP kernelSizeSEXP, SEXP gaussianVarSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -140,7 +159,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerVector& >::type trialEnds(trialEndsSEXP);
     Rcpp::traits::input_parameter< int >::type nshuffles(nshufflesSEXP);
     Rcpp::traits::input_parameter< int >::type minShift(minShiftSEXP);
-    Rcpp::traits::input_parameter< int >::type minOccupancy(minOccupancySEXP);
+    Rcpp::traits::input_parameter< double >::type minOccupancy(minOccupancySEXP);
     Rcpp::traits::input_parameter< int >::type kernelSize(kernelSizeSEXP);
     Rcpp::traits::input_parameter< double >::type gaussianVar(gaussianVarSEXP);
     rcpp_result_gen = Rcpp::wrap(placeFieldStatsForShuffled(bin_x, bin_y, nbins_x, nbins_y, trace, binnedTrace, trialEnds, nshuffles, minShift, minOccupancy, kernelSize, gaussianVar));
@@ -156,6 +175,18 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const int >::type kernelSize(kernelSizeSEXP);
     Rcpp::traits::input_parameter< const double >::type var(varSEXP);
     rcpp_result_gen = Rcpp::wrap(createGaussianKernel(kernelSize, var));
+    return rcpp_result_gen;
+END_RCPP
+}
+// convolve
+arma::mat convolve(arma::mat M, arma::mat k);
+RcppExport SEXP _datatrace_convolve(SEXP MSEXP, SEXP kSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::mat >::type M(MSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type k(kSEXP);
+    rcpp_result_gen = Rcpp::wrap(convolve(M, k));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -206,11 +237,13 @@ static const R_CallMethodDef CallEntries[] = {
     {"_datatrace_gauss_prob", (DL_FUNC) &_datatrace_gauss_prob, 3},
     {"_datatrace_bayesmax_mfr", (DL_FUNC) &_datatrace_bayesmax_mfr, 3},
     {"_datatrace_mutual_info", (DL_FUNC) &_datatrace_mutual_info, 5},
+    {"_datatrace_mutual_info2D", (DL_FUNC) &_datatrace_mutual_info2D, 9},
     {"_datatrace_mutual_info_with_shuffles", (DL_FUNC) &_datatrace_mutual_info_with_shuffles, 8},
     {"_datatrace_create_mfr_model", (DL_FUNC) &_datatrace_create_mfr_model, 6},
     {"_datatrace_calcPlaceField", (DL_FUNC) &_datatrace_calcPlaceField, 9},
     {"_datatrace_placeFieldStatsForShuffled", (DL_FUNC) &_datatrace_placeFieldStatsForShuffled, 12},
     {"_datatrace_createGaussianKernel", (DL_FUNC) &_datatrace_createGaussianKernel, 2},
+    {"_datatrace_convolve", (DL_FUNC) &_datatrace_convolve, 2},
     {"_datatrace_isRunning", (DL_FUNC) &_datatrace_isRunning, 4},
     {"_datatrace_chunkShuffle", (DL_FUNC) &_datatrace_chunkShuffle, 3},
     {"_datatrace_randomShift", (DL_FUNC) &_datatrace_randomShift, 3},

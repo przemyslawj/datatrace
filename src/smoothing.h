@@ -11,4 +11,5 @@
 
 arma::mat createGaussianKernel(const int kernelSize, const double var);
 
+double findSmoothMinOccupancy(arma::mat& occupancyMap, arma::mat& smoothOccupancyMap, double minOccupancy);
 #endif
