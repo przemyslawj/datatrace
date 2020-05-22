@@ -65,11 +65,12 @@ arma::mat calcFrMap(arma::mat& occupancyMap, arma::mat& totalActivityMap, double
  * Calculates MfrModel for the stimulus values and the corresponding firing signal.
  * 
  * Sparsity across the stimulus values, e.g. space, is calculated as:
- * sparsity = (\sum_x p_x * fr_x)^2 / (\sum_x (mfr)^2), where:
+ * sparsity = mfr^2 / (\sum_x (p_x * fr_x^2), where:
  * - x is a stimulus bin, e.g. spatial bin,
  * - p_x - probability of stimulus bin occupancy
  * - fr_x - firing rate for bin x
  * - mfr - mean firing rate
+ * Definition as in Boccara, Science 2019
  */
 MfrModel createMfrModel(IntegerVector& bin_x,
                         IntegerVector& bin_y,
@@ -100,7 +101,7 @@ MfrModel createMfrModel(IntegerVector& bin_x,
     for (int y = 0; y < occupancyMap.n_cols; ++y) {
       if (occupancyMap(x,y) >= minOccupancy && !std::isnan(fr(x,y))) {
         double p_s = (double) occupancyMap(x,y) / trace.size();
-        sparsity += p_s * std::pow(fr(x,y), 2) / std::pow(mfr, 2);
+        sparsity += std::pow(mfr, 2) / (p_s * std::pow(fr(x,y), 2));
       }
     }
   }
