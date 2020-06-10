@@ -70,7 +70,7 @@ arma::mat calcFrMap(arma::mat& occupancyMap, arma::mat& totalActivityMap, double
  * - p_x - probability of stimulus bin occupancy
  * - fr_x - firing rate for bin x
  * - mfr - mean firing rate
- * Definition as in Boccara, Science 2019
+ * Definition as in Skaggs et al, Hippocampus 1996
  */
 MfrModel createMfrModel(IntegerVector& bin_x,
                         IntegerVector& bin_y,
@@ -181,6 +181,10 @@ MfrModel smoothMfr(MfrModel& mfrModel, arma::mat& kernel, double minOccupancy) {
   arma::mat smoothTotalActivity = conv2(mfrModel.totalActivityMap, kernel, "same");
 
   double smoothedMinOccupancy = findSmoothMinOccupancy(mfrModel.occupancyMap, smoothOccupancy, minOccupancy);
+  double kernel_max = kernel(std::floor(kernel.n_rows / 2), std::floor(kernel.n_cols / 2));
+  // ratio between highest and gaussianVar distant value
+  double kernel_vals_ratio = std::exp(-1 / 2);
+  smoothedMinOccupancy = smoothedMinOccupancy * kernel_vals_ratio;
   Debug("Smoothed minoccupancy=" << smoothedMinOccupancy << std::endl);
 
   // Calculate smooth FR map but using original occupancy values for thresholdin min occupancy

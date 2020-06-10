@@ -19,17 +19,20 @@ arma::mat convolve(arma::mat M, arma::mat k) {
   return arma::conv2(M, k, "same");
 }
 
+/**
+ * Returns min value for occupancy in the smoothedOccupancyMap that ensures that
+ * any bin in the occupancyMap that exceeded the minOccupancy exceeds it
+ * in the smoothedOccupancyMap
+ */
 double findSmoothMinOccupancy(arma::mat& occupancyMap, 
                               arma::mat& smoothOccupancyMap, 
                               double minOccupancy) {
-  double minOccupancyVal = DBL_MAX;
   double smoothedMinOccupancy = DBL_MAX;
   for (int x = 0; x < smoothOccupancyMap.n_rows; ++x) {
     for (int y = 0; y < smoothOccupancyMap.n_cols; ++y) {
       int occupancyVal = occupancyMap(x,y);
-      if (occupancyVal >= minOccupancy && occupancyVal <= minOccupancyVal) {
+      if (occupancyVal >= minOccupancy) {
         if (smoothOccupancyMap(x, y) < smoothedMinOccupancy) {
-          minOccupancyVal = occupancyVal;
           smoothedMinOccupancy = smoothOccupancyMap(x, y); 
         }
       }
