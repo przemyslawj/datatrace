@@ -96,15 +96,18 @@ MfrModel createMfrModel(IntegerVector& bin_x,
   }  
   
   arma::mat fr = calcFrMap(occupancyMap, totalActivityMap, minOccupancy);
-  double sparsity = 0.0;
+  double sparsity_denom = 0.0;
   for (int x = 0; x < occupancyMap.n_rows; ++x) {
     for (int y = 0; y < occupancyMap.n_cols; ++y) {
       if (occupancyMap(x,y) >= minOccupancy && !std::isnan(fr(x,y))) {
         double p_s = (double) occupancyMap(x,y) / trace.size();
-        sparsity += std::pow(mfr, 2) / (p_s * std::pow(fr(x,y), 2));
+        if (p_s > 0) {
+          sparsity_denom += (p_s * std::pow(fr(x,y), 2));
+        }
       }
     }
   }
+  double sparsity = std::pow(mfr, 2) / sparsity_denom;
 
   double min_trace = (double) *(std::min_element(trace.cbegin(), trace.cend()));
   return MfrModel(occupancyMap, totalActivityMap, fr, mfr, min_trace, sparsity);

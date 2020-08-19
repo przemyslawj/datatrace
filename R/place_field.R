@@ -3,7 +3,8 @@
 }
 
 # Create df with smoothed values from matrix representation
-create.pf.df = function(M, occupancyM, min.occupancy.sec=1, frame.rate=20, sigma=1.4, smooth=FALSE) {
+create.pf.df = function(M, occupancyM, min.occupancy.sec=1, frame.rate=20, sigma=1.4, 
+                        smooth=FALSE, filter.circular=TRUE) {
   if (smooth) {
     M = gauss2dsmooth(M, lambda=sigma, nx=11, ny=11)
   }
@@ -18,11 +19,12 @@ create.pf.df = function(M, occupancyM, min.occupancy.sec=1, frame.rate=20, sigma
     smoothedOccupancy = gauss2dsmooth(occupancyM, lambda=sigma, nx=11, ny=11)
   }
   
-  #TODO: filtering below assumes a circular maze
-  mid.pt = mean(1:dim(M)[1])
   df_org = reshape2::melt(smoothedOccupancy) %>%
-    dplyr::filter(value >= min.smoothed.occupancy) %>%
-    dplyr::filter(.norm2(Var1 - mid.pt, Var2 - mid.pt) <= mid.pt)
+    dplyr::filter(value >= min.smoothed.occupancy) 
+  if (filter.circular) {
+    mid.pt = (dim(M)[1] + 1) / 2 
+    df_org = dplyr::filter(df_org, .norm2(Var1 - mid.pt, Var2 - mid.pt) <= (mid.pt + 0.25))
+  }
   df2 = left_join(df_org, df1, by=c('Var1'='Var1', 'Var2'='Var2'), suffix=c('.occupancy', '.field'))
   
   return(df2)
@@ -41,16 +43,24 @@ geom_pf = function(df, max.x, max.y) {
   )
 }
 
-plot.pf = function(df, max.x, max.y) {
-  jet.colours = colorRampPalette(c("#00007F", "blue", "#007FFF", "cyan", "#7FFF7F", "yellow", "#FF7F00", "red", "#7F0000"))
-  
-  df %>%
+jet.colours = colorRampPalette(c("#00007F", "blue", "#007FFF", "cyan", "#7FFF7F", "yellow", "#FF7F00", "red", "#7F0000"))
+
+plot.pf = function(df, max.x=NA, max.y=NA) {
+  g = df %>%
     filter(!is.na(value.field)) %>%
     ggplot(aes(x=Var1, y=max.y-Var2)) +
     geom_raster(aes(fill=value.field), interpolate=FALSE) +
     scale_fill_gradientn(colours=jet.colours(7)) +
-    xlim(c(0, max.x)) + ylim(c(0, max.y)) +
     theme_void() 
+  
+  if (!is.na(max.x)) {
+    g = g + xlim(c(0, max.x))
+  }
+  if (!is.na(max.y)) {
+    g = g + ylim(c(0, max.y))
+  }
+  
+  return(g)
 }
 
 plot.trace.events = function(df, event.var=nevents, event.thr=0.5) {
@@ -70,6 +80,7 @@ plot.trace.events = function(df, event.var=nevents, event.thr=0.5) {
 plot.event.vectors = function(df, event.var=nevents, event.thr=0.5) {
   event.var = enquo(event.var)
   arrow.len = 5
+  df$is_running = as.logical(df$is_running)
   df.events = dplyr::filter(df, !!event.var >= event.thr) %>%
     dplyr::mutate(arrow.x = x + cos(angle / 180 * pi) * arrow.len,
                   arrow.y = y + sin(angle / 180 * pi) * arrow.len)

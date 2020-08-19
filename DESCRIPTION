@@ -1,8 +1,8 @@
 Package: datatrace
 Type: Package
 Title: Trace data analysis
-Version: 0.1
-Date: 2020-01-14
+Version: 0.11
+Date: 2020-08-19
 Author: Prez Jarzebowski
 Maintainer: Prez Jarzebowski <jarzeb5@gmail.com>
 Description: Analysis of correlates between traces with cell activity and behavioural data. Includes support for place fields and their metrics as well as decoding behaviour from the cell activity.
