@@ -79,11 +79,11 @@ timebin.traces = function(data.traces, timebin.dur.msec=200) {
   data.traces[, time_bin := floor(abs_timestamp/timebin.dur.msec) %>% as.integer]
   timebinned.traces = data.traces[,
                                   lapply(.SD, mean),
-                                  by=.(animal, date, trial_id, trial, exp_title, cell_id, time_bin),
+                                  by=.(animal, date, exp_title, trial_id, trial, cell_id, time_bin),
                                   .SDcols = !c('is.event')]
   setorder(timebinned.traces, time_bin, cell_id)
   nevents.traces = data.traces[, .(nevents=sum(is.event)),
-                                 by=.(animal, date, trial_id, trial, exp_title, cell_id, time_bin)]
+                                 by=.(animal, date, exp_title, trial_id, trial, cell_id, time_bin)]
   setorder(nevents.traces, time_bin, cell_id)
   timebinned.traces$nevents = nevents.traces$nevents
   timebinned.traces
@@ -91,16 +91,16 @@ timebin.traces = function(data.traces, timebin.dur.msec=200) {
 
 # Bins data.traces[[stim.var]] values, by dividing the into bins of bin.width.
 # Bins are indexed from 1.
-stimbin.traces = function(data.traces, stim.var, nbins, max.width=100) {
+stimbin.traces = function(data.traces, stim.var, nbins, max.width=100, min.width=0) {
   if (nrow(data.traces) == 0) {
     return(data.traces)
   }
   stim.var = enquo(stim.var)
-  bin.width = max.width / nbins
+  bin.width = (max.width - min.width) / nbins
 
   bin.var.name = paste0('bin.', quo_name(stim.var))
   data.traces %>%
-    dplyr::mutate(!!bin.var.name := as.integer(ceiling(pmin(!!stim.var, max.width) / bin.width)))
+    dplyr::mutate(!!bin.var.name := as.integer(ceiling((pmin(!!stim.var, max.width) - min.width) / bin.width)))
 }
 
 
@@ -179,84 +179,38 @@ melt.traces = function(data) {
     }
   }
   .remove.cols.expr(data, "^events_")
-  .remove.cols.expr(data, "^dist")
+  #.remove.cols.expr(data, "^dist")
 
   trace.measure.vars = colnames(data)[stringr::str_starts(colnames(data), 'trace_')]
-  #events.measure.vars = colnames(data)[stringr::str_starts(colnames(data), 'events_')]
   deconv.measure.vars = colnames(data)[stringr::str_starts(colnames(data), 'deconvTrace_')]
   melted.df = melt(data,
        measure = list(trace.measure.vars,
-                      #events.measure.vars,
                       deconv.measure.vars),
        value.name = c('trace',
-                      #'nevents',
                       'deconv_trace'))
 
   melted.df = melted.df[, ('cell') := variable %>% trimws %>% as.integer][order(date,trial_id,cell,timestamp), !'variable']
   return(melted.df)
 }
 
-gather.traces = function(data) {
-  data.traces = data %>%
-    select(-starts_with('events_'), -starts_with('deconvTrace_')) %>%
-    gather('cell', 'trace', starts_with('trace_')) %>%
-    mutate(cell = str_replace(cell, 'trace_[.]?[.]?','')) %>%
-    arrange(date, trial_id, cell, timestamp)
-
-  data.deconv_traces = data %>%
-    select('date', 'trial_id', 'timestamp', starts_with('deconvTrace_')) %>%
-    gather('cell', 'deconv_trace', starts_with('deconvTrace_')) %>%
-    mutate(cell = str_replace(cell, 'deconvTrace_[.]?[.]?','')) %>%
-    arrange(date, trial_id, cell, timestamp)
-
-  #data.events = data %>%
-  #  select('date', 'trial_id', 'timestamp', starts_with('events_')) %>%
-  #  gather('cell', 'nevents', starts_with('events_')) %>%
-  #  mutate(cell = str_replace(cell, 'events_[.]?[.]?','')) %>%
-  #  arrange(date, trial_id, cell, timestamp)
-
-  data = cbind(data.traces,
-               data.deconv_traces$deconv_trace)
-               #data.events$nevents)
-  #colnames(data)[(ncol(data)-1):ncol(data)] = c('deconv_trace', 'nevents')
-  colnames(data)[(ncol(data))] = 'deconv_trace'
-  data$cell = as.integer(data$cell)
-
-  return(data)
-}
-
-
-# Filter based on velocity calculated for the time window. Filtering is done on epochs
-# Slow code, use isRunning for better performance.
-filter.running = function(df, min.run.velocity=2, mean.run.velocity=3, window.dur.ms=500) {
+# Adds is_running column with values equal TRUE when smoothed velocity exceeds the 
+# threshold velocity. The velocity is smoothed using moving average filter of the
+# window.length.
+add.running.col = function(df, mean.run.velocity=3, window.length=10) {
   df = data.table(df)
-  setorder(df, trial_id, exp_title, cell_id, timestamp)
+  setorder(df, exp_title, trial_id, trial, cell_id, timestamp)
   is.running=rep(FALSE, nrow(df))
-  i = 1
-  while (i < nrow(df)) {
-    j = i + 1
-    while(j < nrow(df) &&
-          df$velocity[i] >= min.run.velocity &&
-          df$trial_id[i] == df$trial_id[j] &&
-          df$velocity[j] >= min.run.velocity) {
-      j = j + 1
-    }
-    j = j - 1
-
-    dist = norm2(df$smooth_trans_x[j] - df$smooth_trans_x[i],
-                 df$smooth_trans_y[j] - df$smooth_trans_y[i])
-    dur.ms = max(df$timestamp[j] - df$timestamp[i], 1)
-    vel = dist / dur.ms * 1000
-    is.running[i:j] = (vel >= mean.run.velocity) && (dur.ms >= window.dur.ms)
-    i = j + 1
-  }
-
-  df[which(is.running),]
+  vel.filter = rep(1/window.length, window.length) # moving average filter
+  df[, smooth_velocity := stats::filter(velocity, vel.filter, sides=2),
+     by=.(trial_id, exp_title, cell_id)]
+  #df[, is_running := ifelse(is.na(smooth_velocity), FALSE, smooth_velocity >= mean.run.velocity)]
+  df$is_running = df$smooth_velocity[1:nrow(df)] >= mean.run.velocity
+  df
 }
 
 # Map traces to principal components
-pca.binned.traces = function(binned.traces) {
-  response.matrix = reshape2::acast(binned.traces, time_bin ~ cell_id, value.var='response_bin')
+pca.binned.traces = function(binned.traces, value.var = 'response_bin') {
+  response.matrix = reshape2::acast(binned.traces, time_bin ~ cell_id, value.var=value.var)
   pca.res = prcomp(response.matrix, center = TRUE, scale. = TRUE)
   cumvar = cumsum(pca.res$sdev*pca.res$sdev)
   cumvar.portion = cumvar / cumvar[length(cumvar)]
@@ -264,10 +218,11 @@ pca.binned.traces = function(binned.traces) {
   response.df = as.data.frame(pca.res$x[,1:npc])
   response.df$time_bin = as.integer(rownames(response.matrix))
   pc.measure.vars = colnames(response.df)[stringr::str_starts(colnames(response.df), 'PC')]
-  melt.pc.df = melt(response.df, measure=pc.measure.vars, value.name='mean.trace') %>%
+  melt.pc.df = reshape2::melt(response.df, measure=pc.measure.vars, value.name='mean.trace') %>%
     data.table()
   melt.pc.df[,cell_id:= as.integer(stringr::str_replace(variable, 'PC', ''))]
-  metadata.df = dplyr::select(binned.traces, animal, date, trial_id, trial, time_bin, bin.xy, bin.x, bin.y) %>%
+  metadata.df = dplyr::select(binned.traces, animal, date, trial_id, trial, time_bin, 
+                              bin.xy, bin.x, bin.y, angle, velocity) %>%
     distinct() %>% data.table()
   melt.pc.df = melt.pc.df[metadata.df, on='time_bin']
 

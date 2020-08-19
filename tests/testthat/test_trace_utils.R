@@ -76,7 +76,7 @@ test_that('test detect.events succeeds', {
 
 
 #########################################
-context('Tests for event detection')
+context('Tests for time and stim binning')
 #########################################
 
 test_that('bin.time.space succeeds', {
@@ -106,3 +106,4 @@ test_that('bin.time.space succeeds', {
   expect_equal(res$bin.xy, c(5, 9, 13, 17, 21))
   expect_equal(res$trace, seq(1.5, 9.5, 2))
 })
+

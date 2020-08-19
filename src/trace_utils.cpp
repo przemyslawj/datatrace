@@ -71,6 +71,7 @@ NumericVector randomShift(NumericVector& trace,
 /***
  * Requires DF to be ordered by trial_id, cell_id and timestamp, so the ajacent rows have
  * sequential timestamps.
+ * Depracated: use add.running.col instead.
  */
 // [[Rcpp::export]]
 LogicalVector isRunning(DataFrame& df,
@@ -89,18 +90,22 @@ LogicalVector isRunning(DataFrame& df,
   int i = 0;
   while (i < df.nrows()) {
     int j = i + 1;
+    double dur_ms = 0;
     while(j < df.nrows() && 
           velocity[i] >= min_run_velocity && 
           trial_id[i] == trial_id[j] &&
-          velocity[j] >= min_run_velocity) {
+          velocity[j] >= min_run_velocity &&
+          timestamp[j] >= timestamp[i] &&
+          dur_ms < window_dur_ms) {
       j = j + 1;
+      dur_ms = std::max(timestamp[j] - timestamp[i], 1);
     }
     j = j - 1;
+    dur_ms = std::max(timestamp[j] - timestamp[i], 1);
     
     double distx = pos_x[j] - pos_x[i];
     double disty = pos_y[j] - pos_y[i];
     double dist = sqrt(distx * distx + disty * disty);
-    double dur_ms = std::max(timestamp[j] - timestamp[i], 1);
     double vel = dist / dur_ms * 1000;
     bool is_running = (vel >= mean_run_velocity) && (dur_ms >= window_dur_ms);
     for (int k = i; k <= j; ++k) {
